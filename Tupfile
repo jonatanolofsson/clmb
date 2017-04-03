@@ -1,0 +1,4 @@
+include_rules
+: foreach *.cpp |> !cc |>
+: *.o lapjv/lap.o |> !ar |>
+.gitignore

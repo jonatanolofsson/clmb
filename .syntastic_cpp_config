@@ -1,0 +1,12 @@
+-std=c++0x
+-Wall
+-Werror
+-Wno-unknown-pragmas
+-pedantic-errors
+-Wextra
+-Wcast-align
+-ggdb
+-O0
+-Isys/modules
+-Iapps/helisim
+-isystem/usr/include/eigen3
