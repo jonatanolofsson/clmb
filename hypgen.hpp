@@ -1,11 +1,9 @@
 #pragma once
 
-#include <Eigen/Core>
+#include "lap.hpp"
 
 namespace lmb {
-    typedef Eigen::RowVectorXi Assignment;
-    typedef Eigen::MatrixXd CostMatrix;
-
+    using namespace lap;
     class Murty {
         public:
             Murty(const CostMatrix);
@@ -19,7 +17,4 @@ namespace lmb {
             State state;
             int size;
     };
-
-    void lap(const CostMatrix&, Assignment&, double&);
-    void lapjv(const CostMatrix&, Assignment&, double&);
 }

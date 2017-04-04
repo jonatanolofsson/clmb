@@ -49,8 +49,6 @@ FLAGS = [
     '-ggdb',
     '-O0',
     '-I', '/usr/local/Cellar/eigen/3.3.3/include/eigen3',
-    '-I', '/Users/jonatan/git/or-tools/src',
-    '-I', '/Users/jonatan/git/or-tools/dependencies/install/include',
     '-I', THIS_DIR,
 ]
 
