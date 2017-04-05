@@ -33,7 +33,6 @@ class HypgenTests : public ::testing::Test {
 static const unsigned N_TESTS = 1000000;
 //static const unsigned N_TESTS = 1;
 
-
 TEST_F(HypgenTests, SingleLAP) {
     Assignment res(MURTY_COST.rows());
     double cost;
@@ -41,6 +40,20 @@ TEST_F(HypgenTests, SingleLAP) {
     Slack v(MURTY_COST.cols());
     for (unsigned i = 0; i < N_TESTS; ++i) {
         v.setZero();
+        lap::lap(MURTY_COST, res, u, v, cost);
+    }
+    std::cout << res.transpose() << std::endl;
+}
+
+TEST_F(HypgenTests, SingleLAP2) {
+    Assignment res(MURTY_COST.rows());
+    double cost;
+    Slack u(MURTY_COST.rows());
+    Slack v(MURTY_COST.cols());
+    for (unsigned i = 0; i < N_TESTS; ++i) {
+        v.setZero();
+        auto C = MURTY_COST;
+        remove(C, 5, 5);
         lap::lap(MURTY_COST, res, u, v, cost);
     }
     std::cout << res.transpose() << std::endl;
@@ -56,4 +69,32 @@ TEST_F(HypgenTests, SingleLAP_Asym) {
         lap::lap(MURTY_COST_ASYM, res, u, v, cost);
     }
     std::cout << res.transpose() << std::endl;
+}
+
+TEST_F(HypgenTests, SingleLAPMurty) {
+    State s(MURTY_COST);
+    MaskedMatrix C(s);
+    MaskedRowVector<Assignment> res(s);
+    MaskedRowVector<Slack> u(s);
+    MaskedColVector<Slack> v(s);
+    double cost;
+    for (unsigned i = 0; i < N_TESTS; ++i) {
+        v.v.setZero();
+        lap::lap(C, res, u, v, cost);
+    }
+    std::cout << res.u.transpose() << std::endl;
+}
+
+TEST_F(HypgenTests, SingleLAPMurtyAsym) {
+    State s(MURTY_COST_ASYM);
+    MaskedMatrix C(s);
+    MaskedRowVector<Assignment> res(s);
+    MaskedRowVector<Slack> u(s);
+    MaskedColVector<Slack> v(s);
+    double cost;
+    for (unsigned i = 0; i < N_TESTS; ++i) {
+        v.v.setZero();
+        lap::lap(C, res, u, v, cost);
+    }
+    std::cout << res.u.transpose() << std::endl;
 }

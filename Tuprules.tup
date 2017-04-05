@@ -7,7 +7,7 @@ CFLAGS += -Wno-unknown-pragmas
 CFLAGS += -pedantic-errors
 CFLAGS += -Wextra
 CFLAGS += -Wcast-align
-#CFLAGS += -ggdb
+#CFLAGS += -g
 CFLAGS += -O3
 CFLAGS += -I$(TOP)
 CFLAGS += -I$(TOP)/lapjv
@@ -31,5 +31,6 @@ ifdef USE_GCC
 endif
 
 !cc = |> $(COMPILER) $(CFLAGS) -c %f -o %o |> %B.o
-!testcc = | $(TOP)/libclmb.a |> $(COMPILER) $(CFLAGS) $(TEST_CFLAGS) %f $(TOP)/libclmb.a -o %o $(LFLAGS) $(TEST_LFLAGS) |> %B
+#!testcc = | $(TOP)/libclmb.a |> $(COMPILER) $(CFLAGS) $(TEST_CFLAGS) %f $(TOP)/libclmb.a -o %o $(LFLAGS) $(TEST_LFLAGS) |> %B
+!testcc = |> $(COMPILER) $(CFLAGS) $(TEST_CFLAGS) %f -o %o $(LFLAGS) $(TEST_LFLAGS) |> %B
 !ar = |> ar crs %o %f |> lib%d.a
