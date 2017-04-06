@@ -50,10 +50,10 @@ TEST_F(HypgenTests, SingleLAP2) {
     double cost;
     Slack u(MURTY_COST.rows());
     Slack v(MURTY_COST.cols());
+    Eigen::MatrixXd C;
     for (unsigned i = 0; i < N_TESTS; ++i) {
         v.setZero();
-        auto C = MURTY_COST;
-        remove(C, 5, 5);
+        allbut(MURTY_COST, C, 5, 5);
         lap::lap(MURTY_COST, res, u, v, cost);
     }
     std::cout << res.transpose() << std::endl;
@@ -71,30 +71,11 @@ TEST_F(HypgenTests, SingleLAP_Asym) {
     std::cout << res.transpose() << std::endl;
 }
 
-TEST_F(HypgenTests, SingleLAPMurty) {
+TEST_F(HypgenTests, SingleMurty) {
     State s(MURTY_COST);
-    MaskedMatrix C(s);
-    MaskedRowVector<Assignment> res(s);
-    MaskedRowVector<Slack> u(s);
-    MaskedColVector<Slack> v(s);
-    double cost;
     for (unsigned i = 0; i < N_TESTS; ++i) {
-        v.v.setZero();
-        lap::lap(C, res, u, v, cost);
+        s.solve();
+        s.v.setZero();
     }
-    std::cout << res.u.transpose() << std::endl;
-}
-
-TEST_F(HypgenTests, SingleLAPMurtyAsym) {
-    State s(MURTY_COST_ASYM);
-    MaskedMatrix C(s);
-    MaskedRowVector<Assignment> res(s);
-    MaskedRowVector<Slack> u(s);
-    MaskedColVector<Slack> v(s);
-    double cost;
-    for (unsigned i = 0; i < N_TESTS; ++i) {
-        v.v.setZero();
-        lap::lap(C, res, u, v, cost);
-    }
-    std::cout << res.u.transpose() << std::endl;
+    std::cout << s.solution.transpose() << std::endl;
 }

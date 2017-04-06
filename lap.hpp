@@ -4,7 +4,7 @@
 
 namespace lap {
     typedef Eigen::Matrix<int, Eigen::Dynamic, 1> Assignment;
-    typedef Eigen::Matrix<int, Eigen::Dynamic, 1> Slack;
+    typedef Eigen::Matrix<double, Eigen::Dynamic, 1> Slack;
 
     template<typename CostMatrix, typename Assignment, typename RowSlack, typename ColSlack>
     void lap(const CostMatrix& C, Assignment& x, RowSlack& u, ColSlack& v, double& total_cost) {

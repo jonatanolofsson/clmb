@@ -4,6 +4,7 @@
 #include <vector>
 #include <limits>
 #include <queue>
+#include <vector>
 #include <Eigen/SparseCore>
 #include <algorithm>
 
@@ -12,110 +13,116 @@ namespace lmb {
     static const double LARGE = std::numeric_limits<double>::max();
     typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> CostMatrix;
 
-    void remove(Eigen::MatrixXd& matrix, unsigned row, unsigned col)
+    void allbut(const Eigen::MatrixXd& from, Eigen::MatrixXd& to, const unsigned row, const unsigned col)
     {
-        unsigned rows = matrix.rows();
-        unsigned cols = matrix.cols();
+        unsigned rows = from.rows();
+        unsigned cols = from.cols();
 
-        if(row < rows - 1) {
-            matrix.block(row, 0, rows - row - 1, cols) = matrix.block(row + 1, 0, rows - row - 1, cols);
-        }
-        if(col < cols - 1) {
-            matrix.block(0, col, rows - 1, cols - col - 1) = matrix.block(0, col + 1, rows - 1, cols - col - 1);
-        }
+        to.resize(rows - 1, cols - 1);
 
-        matrix.resize(rows - 1, cols - 1);
+        if (row > 0 && col > 0) {
+            to.block(0, 0, row, col) = from.block(0, 0, row, col);
+        }
+        if (row > 0 && col < cols - 1) {
+            to.block(0, col, row, cols - col - 1) = from.block(0, col + 1, row, cols - col - 1);
+        }
+        if (row < rows - 1 && col > 0) {
+            to.block(row, 0, rows - row - 1, col) = from.block(row + 1, 0, rows - row - 1, col);
+        }
+        if (row < rows - 1 && col < cols - 1) {
+            to.block(row, col, rows - row - 1, cols - col - 1) = from.block(row + 1, col + 1, rows - row - 1, cols - col - 1);
+        }
     }
 
+    void allbut(const Eigen::Matrix<double, Eigen::Dynamic, 1>& from, Eigen::Matrix<double, Eigen::Dynamic, 1>& to, const unsigned row) {
+        unsigned rows = from.rows();
+
+        to.resize(rows - 1, 1);
+
+        if (row > 0) {
+            to.block(0, 0, row, 1) = from.block(0, 0, row, 1);
+        }
+        if (row < rows - 1) {
+            to.block(row, 0, rows - row - 1, 1) = from.block(row + 1, 0, rows - row - 1, 1);
+        }
+    }
+
+    void allbut(const Eigen::Matrix<double, 1, Eigen::Dynamic>& from, Eigen::Matrix<double, 1, Eigen::Dynamic>& to, const unsigned col) {
+        unsigned cols = from.cols();
+
+        to.resize(1, cols - 1);
+
+        if (col > 0) {
+            to.block(0, 0, 1, col) = from.block(0, 0, 1, col);
+        }
+        if (col < cols - 1) {
+            to.block(0, col, 1, cols - col - 1) = from.block(0, col + 1, 1, cols - col - 1);
+        }
+    }
 
     struct State {
-        const CostMatrix& C;
-        Eigen::SparseMatrix<bool> mask;
-        std::vector<int> rows;
-        std::vector<int> cols;
+        Eigen::MatrixXd C;
+        Slack u, v;
+        double cost;
+        bool solved;
+        Assignment solution;
+        std::vector<unsigned> bound;
 
-        State(const CostMatrix& C_)
-        : C(C_), rows(C_.rows()), cols(C_.cols()) {
-            mask.resize(C.rows(), C.cols());
-            for (int i = 0; i < (int)C.rows(); ++i) rows[i] = i;
-            for (int j = 0; j < (int)C.cols(); ++j) cols[j] = j;
-        }
+        State()
+        : solved(false)
+        {}
 
-        State(const State& s) : C(s.C) {
-            mask = s.mask;
-            rows = s.rows;
-            cols = s.cols;
-        }
-
-        State remove(const int row, const int col) {
-            State s(*this);
-            s.mask.insert(row, col) = true;
-            return s;
-        }
-
-        State bind(const int row, const int col) {
-            State s(*this);
-            auto pos = std::find(s.rows.begin(), s.rows.end(), row);
-            if (pos != s.rows.end()) s.rows.erase(pos);
-            pos = std::find(s.cols.begin(), s.cols.end(), col);
-            if (pos != s.cols.end()) s.cols.erase(pos);
-            return s;
-        }
-    };
-
-    template<typename T>
-    struct MaskedRowVector {
-        const State& s;
-        T u;
-
-        MaskedRowVector(const State& s_) : s(s_), u(s.C.rows()) {}
-
-        typename T::Scalar& operator[](const int i) {
-            return u[s.rows[i]];
-        }
-
-        int rows() const {
-            return s.C.rows();
-        }
-
-        void setZero() { u.setZero(); }
-    };
-
-    template<typename T>
-    struct MaskedColVector {
-        const State& s;
-        T v;
-
-        MaskedColVector(const State& s_) : s(s_), v(s.C.cols()) {
+        State(const Eigen::MatrixXd& C_)
+        : C(C_),
+          u(C_.rows()),
+          v(C_.cols()),
+          cost(0),
+          solved(false),
+          solution(C_.rows())
+        {
             v.setZero();
         }
 
-        typename T::Scalar& operator[](const int j) {
-            return v[s.cols[j]];
+        State bind(const unsigned i, const unsigned j) {
+            State s;
+            allbut(s.C, C, i, j);
+            allbut(s.u, u, i);
+            allbut(s.v, v, j);
+            s.solution = solution;
+            s.bound = bound;
+            s.bound.push_back(i);
+            std::sort(s.bound.begin(), s.bound.end());
+
+            s.estimate_cost();
+            return s;
         }
 
-        int cols() const {
-            return s.C.cols();
+        State remove(const unsigned i, const unsigned j) {
+            State s;
+            C = s.C;
+            C(i, j) = LARGE;
+            s.bound = bound;
+            s.solution = solution;
+            s.estimate_cost();
+            return s;
         }
 
-        void setZero() { v.setZero(); }
-    };
-
-    struct MaskedMatrix {
-        const State& s;
-
-        MaskedMatrix(const State& s_) : s(s_) {}
-
-        double operator()(const int i, const int j) const {
-            return s.mask.coeff(i, j) ? LARGE : s.C(s.rows[i], s.cols[j]);
+        void estimate_cost() {
         }
 
-        int rows() const {
-            return s.C.rows();
-        }
-
-        int cols() const {
-            return s.C.cols();
+        void solve() {
+            Assignment res(C.rows());
+            lap::lap(C, res, u, v, cost);
+            unsigned k = 0;
+            auto it = bound.begin();
+            for (unsigned i = 0; i < res.rows(); ++i) {
+                while(it != bound.end() && k == *it) {
+                    ++k;
+                    ++it;
+                }
+                solution[k] = res[i];
+                ++k;
+            }
         }
     };
 
@@ -124,15 +131,6 @@ namespace lmb {
         public:
             Murty(const CostMatrix& C_)
             : C(C_) {
-                State initial_state(C);
-                initial_state.rows.resize(C.rows());
-                for (int i = 0; i < (int)initial_state.rows.size(); ++i) {
-                    initial_state.rows[i] = i;
-                }
-                initial_state.cols.resize(C.cols());
-                for (int j = 0; j < (int)initial_state.cols.size(); ++j) {
-                    initial_state.cols[j] = j;
-                }
             }
 
             void draw(Assignment&, double&) {
