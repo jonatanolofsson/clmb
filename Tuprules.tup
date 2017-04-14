@@ -1,6 +1,6 @@
 TOP = $(TUP_CWD)
 
-CFLAGS  = -std=c++0x
+CFLAGS  = -std=c++1z
 CFLAGS += -Wall
 CFLAGS += -Werror
 CFLAGS += -Wno-unknown-pragmas
@@ -12,12 +12,8 @@ CFLAGS += -O3
 CFLAGS += -I$(TOP)
 CFLAGS += -I$(TOP)/lapjv
 CFLAGS += -isystem/usr/local/Cellar/eigen/3.3.3/include/eigen3
-CFLAGS += -isystem/Users/jonatan/git/or-tools/src
-CFLAGS += -isystem/Users/jonatan/git/or-tools/dependencies/install/include
 
 LFLAGS  = -lpthread
-LFLAGS += -L/Users/jonatan/git/or-tools/lib
-LFLAGS += -lortools
 
 TEST_CFLAGS = -isystem/usr/local/include
 

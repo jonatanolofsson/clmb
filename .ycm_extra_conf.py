@@ -43,7 +43,7 @@ FLAGS = [
     '-Wno-unknown-pragmas',
     '-pedantic-errors',
     '-Wcast-align',
-    '-std=c++11',
+    '-std=c++1z',
     '-x',
     'c++',
     '-ggdb',
