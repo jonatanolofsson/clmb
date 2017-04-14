@@ -37,81 +37,58 @@ Eigen::MatrixXd MURTY_COST_ASYM = (Eigen::MatrixXd(5, 10) <<
               62, 0, 3, 8, 5, 6, 14, 0, 26, 39,
               0, 97, 0, 5, 13, 0, 41, 31, 62, 48).finished();
 
-class HypgenTests : public ::testing::Test {
-    public:
-        HypgenTests() {
-        }
-};
-
-static const unsigned N_TESTS = 1000000;
-//static const unsigned N_TESTS = 1;
-
-TEST_F(HypgenTests, SingleLAP) {
+TEST(LAPTests, SingleLAP) {
     Assignment res(MURTY_COST.rows());
     Slack u(MURTY_COST.rows());
     Slack v(MURTY_COST.cols());
-    for (unsigned i = 0; i < N_TESTS; ++i) {
-        v.setZero();
-        lap::lap(MURTY_COST, res, u, v);
-    }
-    std::cout << res.transpose() << std::endl;
+    lap::lap(MURTY_COST, res, u, v);
+    ASSERT_EQ(res, (Assignment(10) << 8, 6, 2, 7, 5, 3, 9, 0, 4, 1).finished());
 }
 
-TEST_F(HypgenTests, SmallSingle) {
+TEST(LAPTests, SmallSingle) {
     Assignment res(MURTY_COST2.rows());
-    std::cout << MURTY_COST2 << std::endl;
     Slack u(MURTY_COST2.rows());
     Slack v(MURTY_COST2.cols());
     lap::lap(MURTY_COST2, res, u, v);
-    std::cout << res.transpose() << std::endl;
+    ASSERT_EQ(res, (Assignment(3) << 1, 0, 2).finished());
 }
 
-TEST_F(HypgenTests, HardSingle) {
+TEST(LAPTests, HardSingle) {
     Assignment res(MURTY_HARD.rows());
-    std::cout << MURTY_HARD << std::endl;
     Slack u(MURTY_HARD.rows());
     Slack v(MURTY_HARD.cols());
     lap::lap(MURTY_HARD, res, u, v);
-    std::cout << res.transpose() << std::endl;
+    ASSERT_EQ(res, (Assignment(4) << 1, 2, 3, 0).finished());
 }
 
-TEST_F(HypgenTests, SingleLAP2) {
-    Assignment res(MURTY_COST.rows());
-    Slack u(MURTY_COST.rows());
-    Slack v(MURTY_COST.cols());
-    Eigen::MatrixXd C;
-    for (unsigned i = 0; i < N_TESTS; ++i) {
-        v.setZero();
-        allbut(MURTY_COST, C, 5, 5);
-        lap::lap(MURTY_COST, res, u, v);
-    }
-    std::cout << res.transpose() << std::endl;
-}
-
-TEST_F(HypgenTests, SingleLAP_Asym) {
+TEST(LAPTests, SingleLAP_Asym) {
     Assignment res(MURTY_COST_ASYM.rows());
     Slack u(MURTY_COST_ASYM.rows());
     Slack v(MURTY_COST_ASYM.cols());
-    for (unsigned i = 0; i < N_TESTS; ++i) {
-        v.setZero();
-        lap::lap(MURTY_COST_ASYM, res, u, v);
-    }
-    std::cout << res.transpose() << std::endl;
+    lap::lap(MURTY_COST_ASYM, res, u, v);
+    ASSERT_EQ(res, (Assignment(5) << 8, 6, 2, 1, 0).finished());
 }
 
-TEST_F(HypgenTests, SingleState) {
+TEST(LAPTests, SingleState) {
     State s(MURTY_COST);
-    for (unsigned i = 0; i < N_TESTS; ++i) {
-        s.solve();
-        s.v.setZero();
-    }
-    std::cout << s.solution.transpose() << std::endl;
+    s.solve();
+    s.v.setZero();
+    ASSERT_EQ(s.solution, (Assignment(10) << 8, 6, 2, 7, 5, 3, 9, 0, 4, 1).finished());
 }
 
-TEST_F(HypgenTests, SingleMurty) {
+TEST(MurtyTests, SingleMurty) {
     Murty m(MURTY_COST);
     Assignment res;
     double cost;
     m.draw(res, cost);
-    std::cout << res.transpose() << std::endl;
+    ASSERT_EQ(res, (Assignment(10) << 8, 6, 2, 7, 5, 3, 9, 0, 4, 1).finished());
+}
+
+TEST(MurtyTests, FullMurty) {
+    Murty m(MURTY_COST.block<6, 6>(0, 0));
+    Assignment res;
+    double cost;
+    unsigned n = 0;
+    while(m.draw(res, cost)) { ++n; }
+    ASSERT_EQ(n, 720);
 }
