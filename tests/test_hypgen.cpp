@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 #include <Eigen/Core>
 #include <murty.hpp>
+#include <limits>
 
 using namespace lmb;
 
@@ -22,12 +23,13 @@ Eigen::MatrixXd MURTY_COST2 = (Eigen::MatrixXd(3, 3) <<
               0, 44, 13,
               3, 14, 0).finished();
 
-
-Eigen::MatrixXd MURTY_HARD = (Eigen::MatrixXd(4, 4) <<
-    7,    52,    87,    38,
-   27, 30000,    18, 30000,
-   62, 30000,     8,     5,
-   79, 30000, 30000, 30000).finished();
+double linf = std::numeric_limits<double>::infinity();
+Eigen::MatrixXd MURTY_HARD = (Eigen::MatrixXd(4, 10) <<
+  -1.92591,   -2.88444,       linf,      30000,      30000,      30000,    17.8891,      30000,      30000,      30000,
+  -1.92591,   -2.88444,      30000,       linf,      30000,      30000,      30000,    17.8891,      30000,      30000,
+-0.0512712, -0.0512712,      30000,      30000,       linf,      30000,      30000,      30000,   0.287682,      30000,
+-0.0512712, -0.0512712,      30000,      30000,      30000,       linf,      30000,      30000,      30000,      30000
+).finished();
 
 
 Eigen::MatrixXd MURTY_COST_ASYM = (Eigen::MatrixXd(5, 10) <<
@@ -53,14 +55,6 @@ TEST(LAPTests, SmallSingle) {
     ASSERT_EQ(res, (Assignment(3) << 1, 0, 2).finished());
 }
 
-TEST(LAPTests, HardSingle) {
-    Assignment res(MURTY_HARD.rows());
-    Slack u(MURTY_HARD.rows());
-    Slack v(MURTY_HARD.cols());
-    lap::lap(MURTY_HARD, res, u, v);
-    ASSERT_EQ(res, (Assignment(4) << 1, 2, 3, 0).finished());
-}
-
 TEST(LAPTests, SingleLAP_Asym) {
     Assignment res(MURTY_COST_ASYM.rows());
     Slack u(MURTY_COST_ASYM.rows());
@@ -69,11 +63,37 @@ TEST(LAPTests, SingleLAP_Asym) {
     ASSERT_EQ(res, (Assignment(5) << 8, 6, 2, 1, 0).finished());
 }
 
-TEST(LAPTests, SingleState) {
-    State s(MURTY_COST);
+TEST(LAPTests, SingleMurtyState) {
+    MurtyState s(MURTY_COST);
     s.solve();
     s.v.setZero();
     ASSERT_EQ(s.solution, (Assignment(10) << 8, 6, 2, 7, 5, 3, 9, 0, 4, 1).finished());
+}
+
+TEST(MurtyTests, MiniMurty) {
+    Murty m(Eigen::Matrix<double, 1, 1>(0));
+    Assignment res;
+    double cost;
+    m.draw(res, cost);
+    ASSERT_EQ(res, (Assignment(1) << 0).finished());
+}
+
+TEST(MurtyTests, HardSingle) {
+    Murty m(MURTY_HARD);
+    Assignment res;
+    double cost;
+    m.draw(res, cost);
+    ASSERT_EQ(res, (Assignment(4) << 6, 1, 8, 0).finished());
+}
+
+TEST(MurtyTests, SmallMurty) {
+    Eigen::MatrixXd C = (Eigen::MatrixXd(1, 3) << 2.14843, inf, 1.20397).finished();
+    Murty m(C);
+    Assignment res;
+    double cost;
+    unsigned n = 0;
+    while(m.draw(res, cost)) { ++n; }
+    ASSERT_EQ(n, 2);
 }
 
 TEST(MurtyTests, SingleMurty) {

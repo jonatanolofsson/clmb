@@ -69,7 +69,7 @@ namespace lmb {
     }
 
 
-    struct State {
+    struct MurtyState {
         typedef std::vector<std::tuple<double, unsigned, unsigned>> Slacklist;
         Eigen::MatrixXd C;
         Slack u, v;
@@ -80,7 +80,7 @@ namespace lmb {
         Assignment res;
         std::vector<unsigned> rmap, cmap;
 
-        State(const State* s)
+        MurtyState(const MurtyState* s)
         :
           cost(s->cost),
           boundcost(s->boundcost),
@@ -90,7 +90,7 @@ namespace lmb {
           cmap(s->cmap)
         {}
 
-        State(const Eigen::MatrixXd& C_)
+        MurtyState(const Eigen::MatrixXd& C_)
         : C(C_),
           u(C_.rows()),
           v(C_.cols()),
@@ -107,7 +107,7 @@ namespace lmb {
         }
 
         auto partition_with(const unsigned i, const unsigned j) {
-            auto s = std::make_shared<State>(this);
+            auto s = std::make_shared<MurtyState>(this);
 
             allbut(C, s->C, i, j);
             allbut(u, s->u, i);
@@ -121,7 +121,7 @@ namespace lmb {
         }
 
         auto partition_without(const unsigned i, const unsigned j, const double slack) {
-            auto s = std::make_shared<State>(this);
+            auto s = std::make_shared<MurtyState>(this);
             s->C = C;
             s->u = u;
             s->v = v;
@@ -163,7 +163,7 @@ namespace lmb {
             return (cost < inf);
         }
 
-        State::Slacklist minslack() const {
+        MurtyState::Slacklist minslack() const {
             std::vector<std::tuple<double, unsigned, unsigned>> mslack(C.rows());
             double h;
             for (unsigned i = 0; i < C.rows(); ++i) {
@@ -184,9 +184,9 @@ namespace lmb {
         }
     };
 
-    typedef std::shared_ptr<State> StatePtr;
-    struct StatePtrCompare {
-        bool operator()(const StatePtr& a, const StatePtr& b) {
+    typedef std::shared_ptr<MurtyState> MurtyStatePtr;
+    struct MurtyStatePtrCompare {
+        bool operator()(const MurtyStatePtr& a, const MurtyStatePtr& b) {
             if (a->cost > b->cost) {
                 return true;
             } else if (a->cost == b->cost) {
@@ -199,12 +199,16 @@ namespace lmb {
 
     class Murty {
         public:
-            Murty(const CostMatrix& C)
-            {
-                queue.emplace(std::make_shared<State>(C));
+            double offset;
+
+            Murty(CostMatrix C) {
+                double min = C.minCoeff();
+                C.array() -= min;
+                offset = min * C.rows();
+                queue.emplace(std::make_shared<MurtyState>(C));
             }
 
-            void get_partition_index(const State::Slacklist& partition_order, State::Slacklist::iterator p, unsigned& i, unsigned& j) {
+            void get_partition_index(const MurtyState::Slacklist& partition_order, MurtyState::Slacklist::iterator p, unsigned& i, unsigned& j) {
                 i = std::get<1>(*p);
                 j = std::get<2>(*p);
                 for (auto pp = partition_order.begin(); pp != p; ++pp) {
@@ -214,7 +218,7 @@ namespace lmb {
             }
 
             bool draw(Assignment& sol, double& cost) {
-                std::shared_ptr<State> s;
+                std::shared_ptr<MurtyState> s;
                 //std::cout << "Queue size: " << queue.size() << std::endl;
 
                 if (queue.empty()) {
@@ -232,7 +236,7 @@ namespace lmb {
                 }
                 queue.pop();
                 sol = s->solution;
-                cost = s->cost;
+                cost = s->cost + offset;
                 //std::cout << "Solution: " << sol.transpose() << std::endl;
                 //std::cout << "Cost: " << cost << std::endl;
                 //std::cout << "res: " << s->res.transpose() << std::endl;
@@ -249,8 +253,19 @@ namespace lmb {
                 //std::cout << s->C << std::endl;
 
                 auto partition_order = s->minslack();
-                partition_order.pop_back();
 
+                if (partition_order.size() == 1) {
+                    auto p = partition_order.begin();
+                    if (s->cost + std::get<0>(*p) < inf) {
+                        unsigned i = std::get<1>(*p);
+                        unsigned j = std::get<2>(*p);
+                        s->remove(i, j, std::get<0>(*p));
+                        queue.push(s);
+                    }
+                    return (cost < inf);
+                }
+
+                partition_order.pop_back();
                 auto p = partition_order.begin();
                 unsigned i = std::get<1>(*p);
                 unsigned j = std::get<2>(*p);
@@ -281,6 +296,6 @@ namespace lmb {
             }
 
         private:
-            std::priority_queue<StatePtr, std::vector<StatePtr>, StatePtrCompare> queue;
+            std::priority_queue<MurtyStatePtr, std::vector<MurtyStatePtr>, MurtyStatePtrCompare> queue;
     };
 }

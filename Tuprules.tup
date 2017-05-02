@@ -1,16 +1,17 @@
 TOP = $(TUP_CWD)
 
 CFLAGS  = -std=c++1z
+#CFLAGS  = -stdlib=libc++
 CFLAGS += -Wall
 CFLAGS += -Werror
 CFLAGS += -Wno-unknown-pragmas
+CFLAGS += -Wfatal-errors
 CFLAGS += -pedantic-errors
 CFLAGS += -Wextra
 CFLAGS += -Wcast-align
 #CFLAGS += -g
 CFLAGS += -O3
 CFLAGS += -I$(TOP)
-CFLAGS += -I$(TOP)/lapjv
 CFLAGS += -isystem/usr/local/Cellar/eigen/3.3.3/include/eigen3
 
 LFLAGS  = -lpthread
@@ -19,7 +20,6 @@ TEST_CFLAGS = -isystem/usr/local/include
 
 TEST_LFLAGS  = -L/usr/local/lib
 TEST_LFLAGS += -lgtest_main -lgtest
-TEST_LFLAGS += -lpthread
 
 COMPILER = clang++ -Qunused-arguments
 ifdef USE_GCC
@@ -27,6 +27,5 @@ ifdef USE_GCC
 endif
 
 !cc = |> $(COMPILER) $(CFLAGS) -c %f -o %o |> %B.o
-#!testcc = | $(TOP)/libclmb.a |> $(COMPILER) $(CFLAGS) $(TEST_CFLAGS) %f $(TOP)/libclmb.a -o %o $(LFLAGS) $(TEST_LFLAGS) |> %B
 !testcc = |> $(COMPILER) $(CFLAGS) $(TEST_CFLAGS) %f -o %o $(LFLAGS) $(TEST_LFLAGS) |> %B
 !ar = |> ar crs %o %f |> lib%d.a
