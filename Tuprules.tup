@@ -11,15 +11,18 @@ CFLAGS += -Wextra
 CFLAGS += -Wcast-align
 #CFLAGS += -g
 CFLAGS += -O3
+CFLAGS += -isystem/usr/local/opt/llvm/include
 CFLAGS += -I$(TOP)
 CFLAGS += -isystem/usr/local/Cellar/eigen/3.3.3/include/eigen3
+CFLAGS += -fopenmp
 
-LFLAGS  = -lpthread
+LDFLAGS  = -L/usr/local/opt/llvm/lib
+LDFLAGS += -Wl,-rpath,/usr/local/opt/llvm/lib
 
 TEST_CFLAGS = -isystem/usr/local/include
 
-TEST_LFLAGS  = -L/usr/local/lib
-TEST_LFLAGS += -lgtest_main -lgtest
+TEST_LDFLAGS  = -L/usr/local/lib
+TEST_LDFLAGS += -lgtest_main -lgtest
 
 COMPILER = clang++ -Qunused-arguments
 ifdef USE_GCC
@@ -27,5 +30,5 @@ ifdef USE_GCC
 endif
 
 !cc = |> $(COMPILER) $(CFLAGS) -c %f -o %o |> %B.o
-!testcc = |> $(COMPILER) $(CFLAGS) $(TEST_CFLAGS) %f -o %o $(LFLAGS) $(TEST_LFLAGS) |> %B
+!testcc = |> $(COMPILER) $(CFLAGS) $(TEST_CFLAGS) %f -o %o $(LDFLAGS) $(TEST_LDFLAGS) |> %B
 !ar = |> ar crs %o %f |> lib%d.a

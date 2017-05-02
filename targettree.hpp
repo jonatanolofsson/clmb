@@ -2,6 +2,7 @@
 #include <vector>
 #include "RTree.h"
 #include "target.hpp"
+//#include <omp.h>
 
 namespace lmb {
     template<typename Target, typename R>
@@ -22,7 +23,11 @@ namespace lmb {
 
         TargetTree()
         : id_counter(0)
-        {}
+        {
+#ifdef _OPENMP
+            omp_init_lock(&writelock);
+#endif
+        }
 
         ~TargetTree() {
             for (auto t : targets) {
@@ -56,9 +61,19 @@ namespace lmb {
             tree.Insert(t->pdf.aabbox.min, t->pdf.aabbox.max, t);
         }
 
-        // FIXME
-        void lock() {}
-        void unlock() {}
+#ifdef _OPENMP
+        omp_lock_t writelock;
+#endif
+        void lock() {
+#ifdef _OPENMP
+            omp_set_lock(&writelock);
+#endif
+        }
+        void unlock() {
+#ifdef _OPENMP
+            omp_unset_lock(&writelock);
+#endif
+        }
 
         void query(const AABBox& aabbox, Targets& result) {
             result.clear();

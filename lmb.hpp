@@ -43,8 +43,10 @@ namespace lmb {
             }
             targets.unlock();
 
-            for (auto& t : targets.targets) {
-                t->template predict<model>(time);
+            #pragma omp parallel for
+            //for (auto& t : targets.targets) {
+            for (auto t = std::begin(targets.targets); t != std::end(targets.targets); ++t) {
+                *t->template predict<model>(time);
             }
 
             targets.lock();
@@ -65,8 +67,10 @@ namespace lmb {
             }
             targets.unlock();
 
-            for (auto& t : all_targets) {
-                t->template predict<model>(time);
+            #pragma omp parallel for
+            //for (auto& t : all_targets) {
+            for (auto t = std::begin(all_targets); t < std::end(all_targets); ++t) {
+                (*t)->template predict<model>(time);
             }
 
             targets.lock();
@@ -147,8 +151,10 @@ namespace lmb {
 
             cluster(reports, all_targets, clusters);
 
-            for (auto& c : clusters) {
-                cluster_correct<Report, Sensor>(c, sensor);
+            #pragma omp parallel for
+            //for (auto& c : clusters) {
+            for (auto c = std::begin(clusters); c < std::end(clusters); ++c) {
+                cluster_correct<Report, Sensor>(*c, sensor);
             }
 
             birth(reports, sensor, time);
@@ -160,12 +166,14 @@ namespace lmb {
             //std::cout << "rBsum: " << std::accumulate(std::begin(reports), std::end(reports), 0.0, [](double s, const Report& r) { return s + r.rB; }) << std::endl;
 
             if (rBsum >= r_lim) {
-                for (auto& r : reports) {
-                    double nr = r.rB * lambdaB / rBsum;
+                //#pragma omp parallel for
+                //for (auto& r : reports) {
+                for (auto r = std::begin(reports); r < std::end(reports); ++r) {
+                    double nr = r->rB * lambdaB / rBsum;
                     //std::cout << "nr: " << nr << std::endl;
                     //std::cout << "r_lim: " << r_lim << std::endl;
                     if (nr >= r_lim) {
-                        targets.new_target(std::min(nr, rB_max), sensor.pdf(r), time);
+                        targets.new_target(std::min(nr, rB_max), sensor.pdf(*r), time);
                     }
                 }
             }
