@@ -21,10 +21,7 @@ namespace lmb {
              0, dT2, 0, dT;
         Q *= QSCALE / 1000.0;
 
-        for (unsigned i = 0; i < t->pdf.c.size(); ++i) {
-            t->pdf.c[i].m = F * t->pdf.c[i].m;
-            t->pdf.c[i].P = F * t->pdf.c[i].P * F.transpose() + Q;
-        }
+        t->pdf.linear_update(F, Q);
         t->t = time;
     }
 

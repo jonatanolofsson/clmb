@@ -9,6 +9,7 @@
 #include <tuple>
 #include <exception>
 #include <iostream>
+#include <memory>
 
 namespace lmb {
     using namespace lap;

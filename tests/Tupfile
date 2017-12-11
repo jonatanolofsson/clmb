@@ -1,4 +1,4 @@
 include_rules
-:foreach *.cpp |> !testcc |> {tests}
-:foreach {tests} |> ./%f > %o |> %f.output
-.gitignore
+TEST_LDFLAGS += $(TOP)/src/libclmb.a
+:foreach *.cpp | ../src/libclmb.a |> !testcc |> {tests}
+#:foreach {tests} |> ./%f > %o |> %f.output

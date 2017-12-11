@@ -1,6 +1,7 @@
 #include <Eigen/Core>
 #include "lmb.hpp"
 #include "gm.hpp"
+#include "pf.hpp"
 #include "sensors.hpp"
 #include "models.hpp"
 #include <iostream>
@@ -11,6 +12,7 @@ int main() {
     //std::cout << "Press enter to run" << std::endl;
     //std::cin.get();
     typedef SILMB<GM<4>> Filter;
+    //typedef SILMB<PF<4>> Filter;
     Filter lmb;
     lmb.lambdaB = 0.5;
     double kappa = 0.0001;

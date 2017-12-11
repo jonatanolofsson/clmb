@@ -1,4 +1,4 @@
 include_rules
 : foreach *.cpp |> !cc |>
-: *.o |> !ar |>
+: *.o |> !ar |> libclmb.a
 .gitignore

@@ -94,7 +94,7 @@ namespace lmb {
 
         typename Target::PDF pdf(const Report& r) const {
             // FIXME: Better initial covariance (Rasmussen, Williams?)
-            typename Target::PDF::Mean m;
+            typename Target::PDF::State m;
             typename Target::PDF::Covariance P;
             m << r.z[0], r.z[1], 0.0, 0.0;
             P.setZero();

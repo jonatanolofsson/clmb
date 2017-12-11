@@ -1,7 +1,6 @@
 TOP = $(TUP_CWD)
 
-CFLAGS  = -std=c++1z
-#CFLAGS  = -stdlib=libc++
+CFLAGS  = -std=c++17
 CFLAGS += -Wall
 CFLAGS += -Werror
 CFLAGS += -Wno-unknown-pragmas
@@ -11,18 +10,13 @@ CFLAGS += -Wextra
 CFLAGS += -Wcast-align
 #CFLAGS += -g
 CFLAGS += -O3
-CFLAGS += -isystem/usr/local/opt/llvm/include
 CFLAGS += -I$(TOP)
-CFLAGS += -isystem/usr/local/Cellar/eigen/3.3.3/include/eigen3
+CFLAGS += -isystem/usr/include/eigen3
 CFLAGS += -fopenmp
 
-LDFLAGS  = -L/usr/local/opt/llvm/lib
-LDFLAGS += -Wl,-rpath,/usr/local/opt/llvm/lib
+TEST_CFLAGS  = -I$(TOP)/src
 
-TEST_CFLAGS = -isystem/usr/local/include
-
-TEST_LDFLAGS  = -L/usr/local/lib
-TEST_LDFLAGS += -lgtest_main -lgtest
+TEST_LDFLAGS  = -lgtest_main -lgtest
 
 COMPILER = clang++ -Qunused-arguments
 ifdef USE_GCC
@@ -30,5 +24,7 @@ ifdef USE_GCC
 endif
 
 !cc = |> $(COMPILER) $(CFLAGS) -c %f -o %o |> %B.o
+!ar = |> ar crs %o %f |>
+
 !testcc = |> $(COMPILER) $(CFLAGS) $(TEST_CFLAGS) %f -o %o $(LDFLAGS) $(TEST_LDFLAGS) |> %B
-!ar = |> ar crs %o %f |> lib%d.a
+.gitignore

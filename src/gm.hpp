@@ -16,15 +16,15 @@ namespace lmb {
     struct GM {
         static const int STATES = S;
         typedef GM<STATES, MAX_COMPONENTS> Self;
-        typedef Eigen::Matrix<double, STATES, 1> Mean;
+        typedef Eigen::Matrix<double, STATES, 1> State;
         typedef Eigen::Matrix<double, STATES, STATES> Covariance;
 
         struct alignas(16) GaussianComponent {
-            Mean m;
+            State m;
             Covariance P;
             double w;
 
-            GaussianComponent(double w_, const Mean& m_, const Covariance& P_)
+            GaussianComponent(double w_, const State& m_, const Covariance& P_)
             : m(m_),
               P(P_),
               w(w_)
@@ -97,7 +97,7 @@ namespace lmb {
         : pD(1.0)
         {}
 
-        GM(const Mean& mean, const Covariance& cov)
+        GM(const State& mean, const Covariance& cov)
         : c({GaussianComponent(1.0, mean, cov)}),
           aabbox(mean.template topRows<2>(), cov.template topLeftCorner<2, 2>()),
           pD(1.0)
@@ -120,6 +120,15 @@ namespace lmb {
         template<typename Sensor>
         double missed(const Sensor&) {
             return 1 - pD;
+        }
+
+        template<typename FT, typename QT>
+        void linear_update(const FT& F, const QT& Q) {
+            #pragma omp parallel for
+            for (unsigned i = 0; i < c.size(); ++i) {
+                c[i].m = F * c[i].m;
+                c[i].P = F * c[i].P * F.transpose() + Q;
+            }
         }
 
         Self operator+(const Self& rhs) const {
@@ -187,8 +196,8 @@ namespace lmb {
             pdf.normalize();
         }
 
-        Mean mean() const {
-            Mean res;
+        State mean() const {
+            State res;
             res.setZero();
             for (auto& cmp : c) {
                 res += cmp.w * cmp.m;
@@ -196,7 +205,7 @@ namespace lmb {
             return res;
         }
 
-        Covariance cov(const Mean& m) const {
+        Covariance cov(const State& m) const {
             Covariance res;
             res.setZero();
             for (auto& cmp : c) {

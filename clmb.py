@@ -31,12 +31,31 @@ class GM:
             self.c.append((
                 c["w"],
                 np.array(c["m"]),
-                np.matrix(c["P"]).reshape(len(c["m"]), len(c["m"]))
+                np.matrix(c["P"])
             ))
 
     def mean(self):
         """Mean."""
         return np.sum(c[0] * c[1] for c in self.c)
+
+
+class PF:
+    """Particle filter class."""
+
+    def __init__(self, t):
+        """Init."""
+        self.w = np.array(t["w"])
+        self.x = np.array(t["x"])
+
+    def mean(self):
+        """Mean."""
+        return (self.w * self.x).sum(axis=1)[:, np.newaxis]
+
+    def cov(self):
+        """Covariance."""
+        m = self.mean()
+        d = self.x - m
+        return (self.w * d).dot(d.T) / (1 - (self.w * self.w).sum())
 
 
 class Target:
@@ -52,7 +71,8 @@ class Target:
         self.t = t["t"]
         self.cid = t["cid"]
         self.r = t["r"]
-        self.pdf = GM(t["pdf"])
+        types = {"GM": GM, "PF": PF}
+        self.pdf = types[t["pdf"]["type"]](t["pdf"])
         self.history.append((t["la"], self.r, self.pdf))
 
 def eigsorted(cov):
@@ -73,26 +93,34 @@ def cov_ellipse(cov, nstd):
 CMAP = matplotlib.colors.ListedColormap(RandomState(0).rand(256*256, 3))
 
 
+def plot_covell(c, w, x, P):
+    """Plot cov ellipse with border and aplha color."""
+    ca = plot_cov_ellipse(P[0:2, 0:2], x[0:2])
+    ce = plot_cov_ellipse(P[0:2, 0:2], x[0:2])
+    ca.set_alpha(w * 0.2)
+    ce.set_alpha(w * 0.8)
+    ca.set_facecolor(CMAP(c))
+    ce.set_facecolor('none')
+    ce.set_edgecolor(CMAP(c))
+    ce.set_linewidth(1)
+
+
 def plot_trace(t, c=0, covellipse=True, max_back=None, r_values=False, track_id=False, velocity=False, trace=True, **kwargs):
     """Plot single trace."""
     max_back = max_back or 0
     xs, ys, vxs, vys = [], [], [], []
     for ty, r, pdf in t.history[-max_back:]:
-        state = pdf.mean().tolist()
+        state = np.squeeze(pdf.mean()).tolist()
         xs.append(state[0])
         ys.append(state[1])
         vxs.append(state[2])
         vys.append(state[3])
     if covellipse:
-        for w, x, P in pdf.c:
-            ca = plot_cov_ellipse(P[0:2, 0:2], state[0:2])
-            ce = plot_cov_ellipse(P[0:2, 0:2], state[0:2])
-            ca.set_alpha(w * 0.2)
-            ce.set_alpha(w * 0.8)
-            ca.set_facecolor(CMAP(c))
-            ce.set_facecolor('none')
-            ce.set_edgecolor(CMAP(c))
-            ce.set_linewidth(4)
+        if isinstance(pdf, PF):
+            plot_covell(c, 1, state, pdf.cov())
+        elif isinstance(pdf, GM):
+            for w, x, P in pdf.c:
+                plot_covell(c, w, x, P)
     if trace:
         plt.plot(xs, ys, color=CMAP(c), **kwargs)
     if r_values:

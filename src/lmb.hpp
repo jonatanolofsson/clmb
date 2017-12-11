@@ -44,7 +44,6 @@ namespace lmb {
             targets.unlock();
 
             #pragma omp parallel for
-            //for (auto& t : targets.targets) {
             for (auto t = std::begin(targets.targets); t != std::end(targets.targets); ++t) {
                 *t->template predict<model>(time);
             }
@@ -68,7 +67,6 @@ namespace lmb {
             targets.unlock();
 
             #pragma omp parallel for
-            //for (auto& t : all_targets) {
             for (auto t = std::begin(all_targets); t < std::end(all_targets); ++t) {
                 (*t)->template predict<model>(time);
             }
@@ -208,6 +206,7 @@ namespace lmb {
             while(murty.draw(res, cost)) {
                 w = std::exp(-cost);
                 w_sum += w;
+                #pragma omp parallel for
                 for (unsigned i = 0; i < N; ++i) {
                     if ((unsigned)res[i] < M) {
                         R(i, res[i]) += w;
