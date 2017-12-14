@@ -1,0 +1,9 @@
+[submodule "libs/rapidjson"]
+	path = libs/rapidjson
+	url = git@github.com:Tencent/rapidjson.git
+[submodule "libs/beast"]
+	path = libs/beast
+	url = git@github.com:boostorg/beast.git
+[submodule "libs/swss"]
+	path = libs/swss
+	url = git@github.com:eidheim/Simple-WebSocket-Server.git

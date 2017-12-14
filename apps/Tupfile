@@ -1,0 +1,4 @@
+include_rules
+CFLAGS += -I$(TOP)/libs/rapidjson/include
+
+:foreach *.cpp | ../src/libclmb.a |> !appcc |> {apps}

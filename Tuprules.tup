@@ -14,6 +14,16 @@ CFLAGS += -I$(TOP)
 CFLAGS += -isystem/usr/include/eigen3
 CFLAGS += -fopenmp
 
+APP_CFLAGS  = -I$(TOP)/libs/rapidjson/include
+APP_CFLAGS += -I$(TOP)/libs/swss
+
+APP_LDFLAGS  = -lboost_system
+APP_LDFLAGS += -lboost_thread
+APP_LDFLAGS += -lboost_coroutine
+APP_LDFLAGS += -lboost_context
+APP_LDFLAGS += -lssl
+APP_LDFLAGS += -lcrypto
+
 TEST_CFLAGS  = -I$(TOP)/src
 
 TEST_LDFLAGS  = -lgtest_main -lgtest
@@ -27,4 +37,5 @@ endif
 !ar = |> ar crs %o %f |>
 
 !testcc = |> $(COMPILER) $(CFLAGS) $(TEST_CFLAGS) %f -o %o $(LDFLAGS) $(TEST_LDFLAGS) |> %B
+!appcc = |> $(COMPILER) $(CFLAGS) $(APP_CFLAGS) %f -o %o $(LDFLAGS) $(APP_LDFLAGS) |> %B
 .gitignore
