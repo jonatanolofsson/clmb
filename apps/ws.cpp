@@ -74,6 +74,7 @@ class Application {
                 d.Parse(message.c_str());
 
                 // FIXME: Remove echo
+                d["a"] = d["a"].GetInt() + 1;
                 send(d);
             } catch(...) {
                 std::cout << "Failed to parse as JSON: " << message << std::endl;

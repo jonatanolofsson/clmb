@@ -10,7 +10,7 @@ CFLAGS += -Wextra
 CFLAGS += -Wcast-align
 #CFLAGS += -g
 CFLAGS += -O3
-CFLAGS += -I$(TOP)
+CFLAGS += -I$(TOP)/include
 CFLAGS += -isystem/usr/include/eigen3
 CFLAGS += -fopenmp
 

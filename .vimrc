@@ -9,7 +9,7 @@ let s:cpp_options =
 \   " -Wextra" .
 \   " -Wcast-align" .
 \   " -O3" .
-\   " -I" . s:TOP .
+\   " -I" . s:TOP . "/include" .
 \   " -I" . s:TOP . "/libs/rapidjson/include" .
 \   " -I" . s:TOP . "/libs/swss" .
 \   " -isystem/usr/include/eigen3" .

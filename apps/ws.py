@@ -121,7 +121,7 @@ class Application:
     async def _backbone(self):
         """Backbone task."""
         _LOGGER.debug("Started backbone.")
-        await self.send({'a': 2, 'b': 'c'})
+        await self.send({'a': 0, 'b': 'c'})
         while True:
             try:
                 message = await self._inbox.get()
