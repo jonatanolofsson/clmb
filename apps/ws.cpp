@@ -1,13 +1,15 @@
-#include "server_ws.hpp"
 #include "rapidjson/document.h"
-#include "rapidjson/writer.h"
 #include "rapidjson/stringbuffer.h"
-#include <queue>
+#include "rapidjson/writer.h"
+#include "server_ws.hpp"
+#include <Eigen/Core>
 #include <condition_variable>
+#include <exception>
 #include <mutex>
+#include <queue>
 #include <signal.h>
 
-using namespace rapidjson;
+namespace rj = rapidjson;
 
 struct HaltException : public std::exception {};
 
@@ -54,6 +56,50 @@ class Q {
         }
 };
 
+struct ParseError : public std::exception {
+    private:
+        std::string message;
+
+    public:
+        explicit ParseError(const std::string& msg) : message(msg) {}
+
+        virtual const char* what() const throw() {
+            return message.c_str();
+        }
+};
+
+
+Eigen::MatrixXd getMatrix(const rj::Value& mat) {
+    Eigen::MatrixXd res;
+    if(!mat.IsArray()) {
+    }
+    const rj::SizeType rows = mat.Size();
+    if(rows == 0) {
+        throw ParseError("No rows.");
+    }
+    if(!mat[0].IsArray()) {
+        throw ParseError("Row is not array.");
+    }
+    const rj::SizeType cols = mat[0].Size();
+    if(cols == 0) {
+        throw ParseError("No cols.");
+    }
+    res.resize(rows, cols);
+    for(rj::SizeType i = 0; i < rows; ++i) {
+        if(!mat[i].IsArray()) {
+            throw ParseError("Row is not array.");
+        }
+        if(mat[i].Size() != cols) {
+            throw ParseError("Column size mismatch.");
+        }
+        const rj::Value& row = mat[i];
+        for(rj::SizeType j = 0; j < cols; ++j) {
+            res(i, j) = row[j].GetDouble();
+        }
+    }
+    return res;
+}
+
 class Application {
     private:
         using WsServer = SimpleWeb::SocketServer<SimpleWeb::WS>;
@@ -70,12 +116,14 @@ class Application {
 
         void postman(const std::string& message) {
             try {
-                Document d;
+                rj::Document d;
                 d.Parse(message.c_str());
 
-                // FIXME: Remove echo
-                d["a"] = d["a"].GetInt() + 1;
-                send(d);
+                // FIXME: Remove
+                if(d.HasMember("mat")) {
+                        Eigen::MatrixXd mat = getMatrix(d["mat"]);
+                        std::cout << "Got matrix: " << std::endl << mat << std::endl;
+                }
             } catch(...) {
                 std::cout << "Failed to parse as JSON: " << message << std::endl;
             }
@@ -163,9 +211,9 @@ class Application {
             outputqueue.push(std::make_shared<std::string>(str));
         }
 
-        void send(const Document& d) {
-            StringBuffer buffer;
-            Writer<StringBuffer> writer(buffer);
+        void send(const rj::Document& d) {
+            rj::StringBuffer buffer;
+            rj::Writer<rj::StringBuffer> writer(buffer);
             d.Accept(writer);
             send(buffer.GetString());
         }
@@ -182,4 +230,3 @@ void termination_handler(int) { app.kill(); }
 int main() {
     app.wait();
 }
-

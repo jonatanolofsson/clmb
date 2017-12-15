@@ -3,6 +3,7 @@ import argparse
 import asyncio
 import json
 import logging
+import numpy as np
 import signal
 import sys
 import websockets
@@ -54,32 +55,32 @@ class Application:
         _LOGGER.debug("Starting application.")
         self._tasks.main = asyncio.Task.current_task(loop=self._loop)
         self._tasks.backbone = asyncio.ensure_future(self._backbone(), loop=self._loop)  # noqa
-        while True:
-            try:
-                _LOGGER.debug("Connecting to: %s.", self._host)
-                async with websockets.connect(self._host) as self._socket:
-                    _LOGGER.debug("Established connection.")
-                    try:
-                        self._tasks.reader = asyncio.ensure_future(self._reader(), loop=self._loop)  # noqa  # pylint: disable=line-too-long
-                        self._tasks.writer = asyncio.ensure_future(self._writer(), loop=self._loop)  # noqa  # pylint: disable=line-too-long
-                        rwtasks = (self._tasks.reader, self._tasks.writer)
-                        await asyncio.wait(rwtasks, return_when=asyncio.FIRST_COMPLETED)  # noqa
-                    finally:
-                        for task in rwtasks:
-                            if not task.cancelled() and not task.done():
-                                task.cancel()
-                        _LOGGER.debug("Waiting for rwtasks.")
-                        asyncio.wait(rwtasks)
-                        _LOGGER.debug("rwtasks finished.")
-            except asyncio.CancelledError:
-                _LOGGER.debug("Cancelling main.")
-                break
-            except Exception as e:  # pylint: disable=broad-except,invalid-name
-                _LOGGER.warning("Websocket exception: %s",
-                                getattr(e, 'message', repr(e)))
+        try:
+            while True:
+                try:
+                    _LOGGER.debug("Connecting to: %s.", self._host)
+                    async with websockets.connect(self._host) as self._socket:
+                        _LOGGER.debug("Established connection.")
+                        try:
+                            self._tasks.reader = asyncio.ensure_future(self._reader(), loop=self._loop)  # noqa  # pylint: disable=line-too-long
+                            self._tasks.writer = asyncio.ensure_future(self._writer(), loop=self._loop)  # noqa  # pylint: disable=line-too-long
+                            rwtasks = (self._tasks.reader, self._tasks.writer)
+                            await asyncio.wait(rwtasks, return_when=asyncio.FIRST_COMPLETED)  # noqa
+                        finally:
+                            for task in rwtasks:
+                                if not task.cancelled() and not task.done():
+                                    task.cancel()
+                            _LOGGER.debug("Waiting for rwtasks.")
+                            asyncio.wait(rwtasks)
+                            _LOGGER.debug("rwtasks finished.")
+                except Exception as e:  # noqa  # pylint: disable=broad-except,invalid-name
+                    _LOGGER.warning("Websocket exception: %s",
+                                    getattr(e, 'message', repr(e)))
+                except:  # noqa  # pylint: disable=bare-except
+                    pass
                 await asyncio.sleep(5)
-            except:  # noqa  # pylint: disable=bare-except
-                pass
+        except asyncio.CancelledError:
+            _LOGGER.debug("Cancelling main.")
         self._tasks.backbone.cancel()
         _LOGGER.debug("Waiting for backbone.")
         await self._tasks.backbone
@@ -99,6 +100,7 @@ class Application:
             except Exception as e:  # pylint: disable=broad-except,invalid-name
                 _LOGGER.warning("Websocket reader exception: %s",
                                 getattr(e, 'message', repr(e)))
+                break
         _LOGGER.debug("Leaving reader.")
 
     async def _writer(self):
@@ -121,7 +123,8 @@ class Application:
     async def _backbone(self):
         """Backbone task."""
         _LOGGER.debug("Started backbone.")
-        await self.send({'a': 0, 'b': 'c'})
+        a = np.matrix('1 2; 3 4')
+        await self.send({'a': 0, 'b': 'c', 'mat': a.tolist()})
         while True:
             try:
                 message = await self._inbox.get()
