@@ -8,7 +8,7 @@ using namespace lmb;
 TEST(SensorTests, Likelihood) {
     auto m = Eigen::Vector2d({1, 1});
     auto P = Eigen::Matrix2d::Identity();
-    Report z(m, P, 1);
+    GaussianReport z(m, P, 1);
     auto a = Eigen::Vector2d({1, 1});
     auto Dinv = Eigen::Matrix2d::Identity().inverse();
 

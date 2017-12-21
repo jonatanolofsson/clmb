@@ -7,45 +7,43 @@
 #include <numeric>
 #include <iostream>
 #include "murty.hpp"
+#include "params.hpp"
 #include "sensors.hpp"
 #include "target.hpp"
 #include "bbox.hpp"
 #include "connectedcomponents.hpp"
 #include "targettree.hpp"
+#include "omp.hpp"
 
 namespace lmb {
     template<typename PDF>
     struct SILMB {
-        typedef lmb::Target<PDF> Target;
-        typedef lmb::Targets<PDF> Targets;
+        typedef SILMB<PDF> Self;
+        typedef Target<PDF> Target;
+        typedef Targets<PDF> Targets;
+        typedef GaussianComponent<PDF::STATES> Gaussian;
+        typedef Params Params;
 
-        double w_lim;
-        double r_lim;
-        double nhyp_max;
-        double rB_max;
-        double lambdaB;
+        Params* params;
 
         TargetTree<PDF> targets;
 
-        SILMB()
-        : w_lim(0.01),
-          r_lim(0.01),
-          nhyp_max(100),
-          rB_max(0.5),
-          lambdaB(1)
-        {}
+        SILMB(Params* params_) : params(params_) {}
 
-        template<void(*model)(Target* const, double)>
-        void predict(double time) {
+
+        template<typename Model>
+        void predict(Model& model, double time) {
             targets.lock();
             for (auto& t : targets.targets) {
                 targets.remove(t);
             }
             targets.unlock();
 
-            #pragma omp parallel for
-            for (auto t = std::begin(targets.targets); t != std::end(targets.targets); ++t) {
-                *t->template predict<model>(time);
+            PARFOR
+            for (auto t = std::begin(targets.targets); t < std::end(targets.targets); ++t) {
+                //std::cout << "Before (" << (*t)->id << "): " << (*t)->pdf.mean().format(eigenformat) << std::endl;
+                (*t)->template predict<Model>(model, time);
+                //std::cout << "After  (" << (*t)->id << "): " << (*t)->pdf.mean().format(eigenformat) << std::endl;
             }
 
             targets.lock();
@@ -55,8 +53,8 @@ namespace lmb {
             targets.unlock();
         }
 
-        template<void(*model)(Target* const, double)>
-        void predict(const AABBox& aabbox, double time) {
+        template<typename Model>
+        void predict(Model& model, const AABBox& aabbox, double time) {
             Targets all_targets;
             targets.query(aabbox, all_targets);
 
@@ -66,9 +64,9 @@ namespace lmb {
             }
             targets.unlock();
 
-            #pragma omp parallel for
+            PARFOR
             for (auto t = std::begin(all_targets); t < std::end(all_targets); ++t) {
-                (*t)->template predict<model>(time);
+                (*t)->template predict<Model>(model, time);
             }
 
             targets.lock();
@@ -149,8 +147,7 @@ namespace lmb {
 
             cluster(reports, all_targets, clusters);
 
-            #pragma omp parallel for
-            //for (auto& c : clusters) {
+            PARFOR
             for (auto c = std::begin(clusters); c < std::end(clusters); ++c) {
                 cluster_correct<Report, Sensor>(*c, sensor);
             }
@@ -158,20 +155,20 @@ namespace lmb {
             birth(reports, sensor, time);
         }
 
-        template<typename Reports, typename Sensor>
-        void birth(const Reports& reports, Sensor& sensor, double time) {
+        template<typename Report, typename Sensor>
+        void birth(const std::vector<Report>& reports, Sensor& sensor, double time) {
             double rBsum = std::accumulate(std::begin(reports), std::end(reports), 0.0, [](double s, const Report& r) { return s + r.rB; });
             //std::cout << "rBsum: " << std::accumulate(std::begin(reports), std::end(reports), 0.0, [](double s, const Report& r) { return s + r.rB; }) << std::endl;
 
-            if (rBsum >= r_lim) {
-                //#pragma omp parallel for
-                //for (auto& r : reports) {
+            if (rBsum >= params->r_lim) {
+                PARFOR
                 for (auto r = std::begin(reports); r < std::end(reports); ++r) {
-                    double nr = r->rB * lambdaB / rBsum;
+                    double nr = r->rB * sensor.lambdaB / rBsum;
                     //std::cout << "nr: " << nr << std::endl;
-                    //std::cout << "r_lim: " << r_lim << std::endl;
-                    if (nr >= r_lim) {
-                        targets.new_target(std::min(nr, rB_max), sensor.pdf(*r), time);
+                    //std::cout << "r_lim: " << params->r_lim << std::endl;
+                    if (nr >= params->r_lim) {
+                        //std::cout << "New target: " << nr << std::endl;
+                        targets.new_target(std::min(nr, params->rB_max), sensor.pdf(params, *r), time);
                     }
                 }
             }
@@ -195,6 +192,9 @@ namespace lmb {
                 C(i, M + N + i) = c.targets[i]->false_target();
             }
 
+            //std::cout << "N: " << N << "  M: " << M << std::endl;
+            //std::cout << "C:" << std::endl << C << std::endl;
+
             Murty murty(C);
             Assignment res;
             double cost;
@@ -215,7 +215,7 @@ namespace lmb {
                     }
                 }
                 ++n;
-                if (w / w_sum < w_lim or n >= nhyp_max) {
+                if (w / w_sum < params->w_lim or n >= params->nhyp_max) {
                     break;
                 }
             }
@@ -252,7 +252,7 @@ namespace lmb {
             }
         }
 
-        void dump(std::ostream& os) const {
+        void repr(std::ostream& os) const {
             os << "{\"targets\":[";
             bool first = true;
             for (auto& t : targets.targets) {
@@ -265,7 +265,7 @@ namespace lmb {
 
     template<typename PDF>
     auto& operator<<(std::ostream& os, const SILMB<PDF>& f) {
-        f.dump(os);
+        f.repr(os);
         return os;
     }
 }

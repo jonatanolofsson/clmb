@@ -11,8 +11,6 @@ import websockets
 logging.basicConfig(level=logging.DEBUG)
 _LOGGER = logging.getLogger(__name__)
 
-_LOGGER.warning("ASDASDASD")
-
 
 class Dotdict(dict):
     """dot.notation access to dictionary attributes"""

@@ -1,5 +1,6 @@
 #pragma once
 #include "bbox.hpp"
+#include "gauss.hpp"
 #include <iostream>
 
 namespace lmb {
@@ -14,6 +15,7 @@ namespace lmb {
         typedef PDF_ PDF;
         typedef Target<PDF> Self;
         typedef std::vector<Self*> Targets;
+        typedef GaussianComponent<PDF::STATES> Gaussian;
         unsigned id;
         double r;
         PDF pdf;
@@ -21,6 +23,14 @@ namespace lmb {
         unsigned cluster;
         double t;
         Action last_action;
+
+        Target()
+        : r(0),
+          pdfs(0),
+          cluster(0),
+          t(0.0),
+          last_action(ACTION_INIT)
+        {}
 
         Target(double r_, PDF&& pdf_)
         : r(r_),
@@ -37,7 +47,6 @@ namespace lmb {
         template<typename Report, typename Sensor, typename RES, typename MRES>
         void match(const std::vector<Report*>& reports, const Sensor& sensor, RES&& res, MRES& mres) {
             unsigned M = reports.size();
-            pdf.pD = sensor.pD(this);
             pdfs.clear();
             pdfs.resize(M + 1, pdf);
 
@@ -58,8 +67,8 @@ namespace lmb {
             }
         }
 
-        template<void(*model)(Self* const, double)>
-        void predict(double time) {
+        template<typename Model>
+        void predict(Model& model, double time) {
             model(this, time);
             pdf.normalize();
             r *= pdf.eta;
@@ -74,11 +83,11 @@ namespace lmb {
             }
         }
 
-        void update_bbox() {
-            aabbox(pdf.aabbox);
+        Gaussian gauss_state() {
+            return Gaussian(r, pdf.mean(), pdf.cov());
         }
 
-        void dump(std::ostream& os) const {
+        void repr(std::ostream& os) const {
             os << "{\"id\":" << id
                << ",\"cid\":" << cluster
                << ",\"la\":\"" << char(last_action) << "\""
@@ -90,7 +99,7 @@ namespace lmb {
 
     template<typename PDF>
     auto& operator<<(std::ostream& os, const Target<PDF>& t) {
-        t.dump(os);
+        t.repr(os);
         return os;
     }
 

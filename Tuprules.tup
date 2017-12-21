@@ -13,9 +13,13 @@ CFLAGS += -O3
 CFLAGS += -I$(TOP)/include
 CFLAGS += -isystem/usr/include/eigen3
 CFLAGS += -fopenmp
+CFLAGS += -fPIC
+CFLAGS += -DNOPAR
 
 APP_CFLAGS  = -I$(TOP)/libs/rapidjson/include
 APP_CFLAGS += -I$(TOP)/libs/swss
+PY_CFLAGS = -shared -I$(TOP)/libs/pybind11/include -I/usr/include/python3.6m -I/usr/include/python3.6m -Wno-nested-anon-types  -Wno-unused-result -Wsign-compare -march=x86-64 -mtune=generic -O2 -pipe -fstack-protector-strong -fno-plt -DNDEBUG -g -fwrapv -O3 -Wall -Wstrict-prototypes
+TEST_CFLAGS  = -I$(TOP)/src
 
 APP_LDFLAGS  = -lboost_system
 APP_LDFLAGS += -lboost_thread
@@ -23,8 +27,8 @@ APP_LDFLAGS += -lboost_coroutine
 APP_LDFLAGS += -lboost_context
 APP_LDFLAGS += -lssl
 APP_LDFLAGS += -lcrypto
+PY_LDFLAGS = -L/usr/lib -lpython3.6m -lpthread -ldl  -lutil -lm  -Xlinker -export-dynamic $(TOP)/src/libclmb.a
 
-TEST_CFLAGS  = -I$(TOP)/src
 
 TEST_LDFLAGS  = -lgtest_main -lgtest
 
@@ -38,4 +42,5 @@ endif
 
 !testcc = |> $(COMPILER) $(CFLAGS) $(TEST_CFLAGS) %f -o %o $(LDFLAGS) $(TEST_LDFLAGS) |> %B
 !appcc = |> $(COMPILER) $(CFLAGS) $(APP_CFLAGS) %f -o %o $(LDFLAGS) $(APP_LDFLAGS) |> %B
+!pycc = |> $(COMPILER) $(CFLAGS) $(APP_CFLAGS) $(PY_CFLAGS) %f -o %o $(LDFLAGS) $(APP_LDFLAGS) $(PY_LDFLAGS) |> %B.cpython-36m-x86_64-linux-gnu.so
 .gitignore

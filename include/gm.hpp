@@ -1,13 +1,16 @@
 #pragma once
-#include <vector>
-#include <numeric>
 #include <Eigen/Dense>
-#include <cmath>
-#include <set>
-#include <queue>
-#include "sensors.hpp"
-#include "constants.hpp"
 #include <Eigen/StdVector>
+#include <cmath>
+#include <numeric>
+#include <queue>
+#include <set>
+#include <vector>
+#include "constants.hpp"
+#include "gauss.hpp"
+#include "omp.hpp"
+#include "params.hpp"
+#include "sensors.hpp"
 
 namespace lmb {
     static const double gmw_lim = 0.05; // FIXME
@@ -18,26 +21,11 @@ namespace lmb {
         typedef GM<STATES, MAX_COMPONENTS> Self;
         typedef Eigen::Matrix<double, STATES, 1> State;
         typedef Eigen::Matrix<double, STATES, STATES> Covariance;
-
-        struct alignas(16) GaussianComponent {
-            State m;
-            Covariance P;
-            double w;
-
-            GaussianComponent(double w_, const State& m_, const Covariance& P_)
-            : m(m_),
-              P(P_),
-              w(w_)
-            {}
-
-            bool operator<(const GaussianComponent& b) const {
-                return w < b.w;
-            }
-        };
+        typedef GaussianComponent<S> GaussianComponent;
+        Params* params;
 
         std::vector<GaussianComponent, Eigen::aligned_allocator<GaussianComponent>> c;
         AABBox aabbox;
-        double pD;
         double eta;
 
         void normalize() {
@@ -69,8 +57,8 @@ namespace lmb {
                 auto l = solver.eigenvalues();
                 auto e = solver.eigenvectors();
 
-                double r1 = NSTD * std::sqrt(l[0]);
-                double r2 = NSTD * std::sqrt(l[1]);
+                double r1 = params->nstd * std::sqrt(l[0]);
+                double r2 = params->nstd * std::sqrt(l[1]);
                 double theta = std::atan2(e.col(1).y(), e.col(1).x());
 
                 double ux = r1 * std::cos(theta);
@@ -93,23 +81,22 @@ namespace lmb {
             eta = 0;
         }
 
-        GM()
-        : pD(1.0)
+        GM() {}
+        GM(Params* params_) : params(params_) {}
+
+        GM(Params* params_, const State& mean, const Covariance& cov)
+        : params(params_),
+          c({GaussianComponent(1.0, mean, cov)}),
+          aabbox(mean.template topRows<2>(), cov.template topLeftCorner<2, 2>(), params->nstd)
         {}
 
-        GM(const State& mean, const Covariance& cov)
-        : c({GaussianComponent(1.0, mean, cov)}),
-          aabbox(mean.template topRows<2>(), cov.template topLeftCorner<2, 2>()),
-          pD(1.0)
-        {}
-
-        template<typename Measurement, typename Sensor>
-        double correct(const Measurement& z, const Sensor& s) {
+        template<typename Report, typename Sensor>
+        double correct(const Report& z, const Sensor& s) {
             for (unsigned i = 0; i < c.size(); ++i) {
                 auto dz = (z.z - s.measurement(c[i].m)).eval();
                 auto Dinv = (s.H * c[i].P * s.H.transpose() + z.R).inverse().eval();
                 auto K = c[i].P * s.H.transpose() * Dinv;
-                c[i].w *= pD * z.likelihood(dz, Dinv) / z.kappa;
+                c[i].w *= s.pD(c[i].m, c[i].P) * z.likelihood(dz, Dinv) / z.kappa;
                 c[i].m += K * dz;
                 c[i].P -= K * s.H * c[i].P;
             }
@@ -118,13 +105,17 @@ namespace lmb {
         }
 
         template<typename Sensor>
-        double missed(const Sensor&) {
-            return 1 - pD;
+        double missed(const Sensor& s) {
+            for (unsigned i = 0; i < c.size(); ++i) {
+                c[i].w *= s.pD(c[i].m, c[i].P);
+            }
+            normalize();
+            return 1 - eta;
         }
 
         template<typename FT, typename QT>
         void linear_update(const FT& F, const QT& Q) {
-            #pragma omp parallel for
+            PARFOR
             for (unsigned i = 0; i < c.size(); ++i) {
                 c[i].m = F * c[i].m;
                 c[i].P = F * c[i].P * F.transpose() + Q;
@@ -145,12 +136,12 @@ namespace lmb {
             return *this;
         }
 
-        void dump(std::ostream& os) const {
+        void repr(std::ostream& os) const {
             os << "{\"type\":\"GM\",\"c\":[";
             bool first = true;
             for (unsigned n = 0; n < c.size(); ++n) {
                 if (!first) { os << ","; } else { first = false; }
-                os << "{\"w\":" << c[n].w << ",\"m\":" << c[n].m.format(eigenformat) << ",\"P\":" << c[n].P.format(eigenformat) << "}";
+                os << c[n];
             }
             os << "]}";
         }
@@ -222,7 +213,7 @@ namespace lmb {
 
     template<int STATES, int MAX_COMPONENTS = 200>
     auto& operator<<(std::ostream& os, const GM<STATES, MAX_COMPONENTS>& t) {
-        t.dump(os);
+        t.repr(os);
         return os;
     }
 }

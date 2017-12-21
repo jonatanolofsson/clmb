@@ -1,4 +1,4 @@
 include_rules
 TEST_LDFLAGS += $(TOP)/src/libclmb.a
 :foreach *.cpp | ../src/libclmb.a |> !testcc |> {tests}
-#:foreach {tests} |> ./%f > %o |> %f.output
+:foreach {tests} |> ./%f > %o |> %f.output

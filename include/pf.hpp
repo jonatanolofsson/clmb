@@ -8,6 +8,8 @@
 #include <set>
 #include <vector>
 #include "constants.hpp"
+#include "omp.hpp"
+#include "params.hpp"
 #include "sensors.hpp"
 #include "statistics.hpp"
 
@@ -25,9 +27,9 @@ namespace lmb {
         typedef Eigen::Matrix<double, STATES, STATES> Covariance;
         typedef Eigen::Array<double, STATES, Eigen::Dynamic> States;
         typedef Eigen::Array<double, 1, Eigen::Dynamic> Weights;
+        Params* params;
 
         AABBox aabbox;
-        double pD = 1;
         double eta;
         Weights w;
         States x;
@@ -41,8 +43,17 @@ namespace lmb {
             std::iota(std::begin(permutation), std::end(permutation), 0);
         }
 
-        PF(const State& mean, const Covariance& covariance)
-        : w(1, N),
+        PF(Params* params_)
+        : params(params_),
+          w(1, N),
+          x(S, N)
+        {
+            std::iota(std::begin(permutation), std::end(permutation), 0);
+        }
+
+        PF(Params* params_, const State& mean, const Covariance& covariance)
+        : params(params_),
+          w(1, N),
           x(S, N)
         {
             std::iota(std::begin(permutation), std::end(permutation), 0);
@@ -52,7 +63,7 @@ namespace lmb {
 
         template<typename FT, typename QT>
         void linear_update(const FT& F, const QT&) {
-            #pragma omp parallel for
+            PARFOR
             for (unsigned i = 0; i < x.cols(); ++i) {
                 x.col(i).matrix() = F * x.col(i).matrix();
             }
@@ -61,7 +72,7 @@ namespace lmb {
         template<typename Measurement, typename Sensor>
         double correct(const Measurement& z, const Sensor& s) {
             auto Dinv = z.R.inverse().eval();
-            #pragma omp parallel for
+            PARFOR
             for(unsigned i = 0; i < N; ++i) {
                 auto dz = (z.z - s.measurement(x.col(i).matrix())).eval();
                 w[i] *= s.pD(x.col(i)) * z.likelihood(dz, Dinv) / z.kappa;
@@ -80,7 +91,7 @@ namespace lmb {
             update_bbox();
         }
 
-        void update_bbox(const double lim=0.1) {
+        void update_bbox(const double lim=0.01) {  // FIXME: Change to nstd
             if (!valid) { return; }
 
             aabbox.min[0] = std::numeric_limits<double>::infinity();
@@ -110,7 +121,7 @@ namespace lmb {
             unsigned j = 0;
 
             States x2;
-            #pragma omp parallel for
+            PARFOR
             for(unsigned i = 0; i < N; ++i) {
                 double u = u0 + i * w0;
                 while(cdf[j] < u) { ++j; }
@@ -126,23 +137,16 @@ namespace lmb {
         }
 
         template<typename Sensor>
-        double missed(const Sensor&) {
-            return 1 - pD; // FIXME: Depending on FOV
+        double missed(const Sensor& s) {
+            PARFOR
+            for(unsigned i = 0; i < N; ++i) {
+                w[i] *= s.pD(x.col(i));
+            }
+            normalize();
+            return 1 - eta;
         }
 
-        //Self operator+(const Self& rhs) const {
-            //Self res();
-            //join(res, {0.5, 0.5}, {*this, rhs})
-            //return res;
-        //}
-
-        //Self operator+=(const Self& rhs) {
-            //c.reserve(c.size() + rhs.c.size());
-            //c.insert(c.end(), rhs.c.begin(), rhs.c.end());
-            //return *this;
-        //}
-
-        void dump(std::ostream& os) const {
+        void repr(std::ostream& os) const {
             os << "{\"type\":\"PF\"";
             os << ",\"w\":" << w.format(eigenformat);
             os << ",\"x\":" << x.format(eigenformat);
@@ -204,7 +208,7 @@ namespace lmb {
 
     template<unsigned STATES, unsigned PARTICLES = 200>
     auto& operator<<(std::ostream& os, const PF<STATES, PARTICLES>& t) {
-        t.dump(os);
+        t.repr(os);
         return os;
     }
 }

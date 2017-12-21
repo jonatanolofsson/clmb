@@ -32,7 +32,7 @@ namespace lmb {
         {}
 
         template<typename T1, typename T2>
-        AABBox(const T1& x, const T2& P, double nstd = NSTD) {
+        AABBox(const T1& x, const T2& P, double nstd = 2.0) {
             Eigen::SelfAdjointEigenSolver<Eigen::Matrix2d> solver(P);
             auto l = solver.eigenvalues();
             auto e = solver.eigenvectors();
@@ -55,13 +55,13 @@ namespace lmb {
             max[1] = x[1] + dy;
         }
 
-        void print(std::ostream& o) const {
+        void repr(std::ostream& o) const {
             o << "AABBox[" << min[0] << ", " << min[1] << ", " << max[0] << ", " << max[1] << "]";
         }
     };
 
     auto& operator<<(std::ostream& os, const AABBox& bbox) {
-        bbox.print(os);
+        bbox.repr(os);
         return os;
     }
 
@@ -89,5 +89,14 @@ namespace lmb {
                 corners.row(0).maxCoeff(),
                 corners.row(1).maxCoeff());
         }
+
+        void repr(std::ostream& os) const {
+            os << "{\"type\":\"BBox\",\"c\":" << corners.format(eigenformat) << "}";
+        }
     };
+
+    auto& operator<<(std::ostream& os, const BBox& bbox) {
+        bbox.repr(os);
+        return os;
+    }
 }
