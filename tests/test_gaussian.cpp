@@ -2,22 +2,19 @@
 #include <Eigen/Core>
 #include "gm.hpp"
 #include "target.hpp"
-#include "params.hpp"
 
 using namespace lmb;
 
-TEST(GMTests, Correct) {
-    typedef GM<4> PDF;
+TEST(GaussianTests, Correct) {
+    typedef Gaussian<4> PDF;
     typedef Target<PDF> Target;
-    Params params;
-    PDF pdf(&params, {0, 0, 0, 0}, PDF::Covariance::Identity());
+    PDF pdf(1.0, {0, 0, 0, 0}, PDF::Covariance::Identity());
     auto mr = pdf.mean();
     auto Pr = pdf.cov();
     EXPECT_NEAR(mr[0], 0, 1e-2);
     EXPECT_NEAR(mr[1], 0, 1e-2);
     EXPECT_NEAR(Pr(0, 0), Pr(1, 1), 1e-2);
     EXPECT_NEAR(Pr(0, 0), 1.0, 1e-2);
-    EXPECT_EQ(pdf.c.size(), 1);
 
     GaussianReport::Measurement m(2); m = Eigen::Vector2d({1, 1});
     GaussianReport::Covariance P(2, 2); P = Eigen::Matrix2d::Identity();
@@ -29,20 +26,8 @@ TEST(GMTests, Correct) {
     EXPECT_NEAR(mr[0], 0.5, 1e-2);
     EXPECT_NEAR(mr[1], 0.5, 1e-2);
     EXPECT_NEAR(Pr(0, 0), Pr(1, 1), 1e-2);
-    EXPECT_NEAR(pdf.eta, 0.05, 5e-2);
-    EXPECT_EQ(pdf.c.size(), 1);
-}
-
-TEST(GMTests, Copy) {
-    typedef GM<2> PDF;
-    Params params;
-    PDF pdf(&params, {0, 0}, PDF::Covariance::Identity());
-    PDF pdf2(pdf);
-    PDF pdf3(&params);
-    pdf3 = pdf;
-    EXPECT_EQ(pdf.c.size(), 1);
-    pdf += pdf2;
-    EXPECT_EQ(pdf.c.size(), 2);
-    EXPECT_EQ(pdf2.c.size(), 1);
-    EXPECT_EQ(pdf3.c.size(), 1);
+    EXPECT_NEAR(Pr(0, 0), 0.5, 1e-2);
+    EXPECT_NEAR(Pr(2, 2), Pr(3, 3), 1e-2);
+    EXPECT_NEAR(Pr(2, 2), 1, 1e-2);
+    std::cout << Pr << std::endl;
 }

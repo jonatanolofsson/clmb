@@ -27,20 +27,26 @@ APP_LDFLAGS += -lboost_coroutine
 APP_LDFLAGS += -lboost_context
 APP_LDFLAGS += -lssl
 APP_LDFLAGS += -lcrypto
-PY_LDFLAGS = -L/usr/lib -lpython3.6m -lpthread -ldl  -lutil -lm  -Xlinker -export-dynamic $(TOP)/src/libclmb.a
+PY_LDFLAGS = -L/usr/lib -lpython3.6m -lpthread -ldl  -lutil -lm  -Xlinker -export-dynamic
 
 
 TEST_LDFLAGS  = -lgtest_main -lgtest
+
+COV_CFLAGS  = -fprofile-arcs
+COV_CFLAGS += -ftest-coverage
+COV_CFLAGS += -fprofile-instr-generate -fcoverage-mapping
+COV_LDFLAGS = -lgcov
+COV_OUT = %B.gcno
+COV_RUNOUT = %B.gcda %B.profraw
 
 COMPILER = clang++ -Qunused-arguments
 ifdef USE_GCC
     COMPILER = g++
 endif
 
-!cc = |> $(COMPILER) $(CFLAGS) -c %f -o %o |> %B.o
+!cc = |> $(COMPILER) $(CFLAGS) $(COV_CFLAGS) -c %f -o %o |> %B.o | $(COV_OUT)
 !ar = |> ar crs %o %f |>
 
-!testcc = |> $(COMPILER) $(CFLAGS) $(TEST_CFLAGS) %f -o %o $(LDFLAGS) $(TEST_LDFLAGS) |> %B
 !appcc = |> $(COMPILER) $(CFLAGS) $(APP_CFLAGS) %f -o %o $(LDFLAGS) $(APP_LDFLAGS) |> %B
 !pycc = |> $(COMPILER) $(CFLAGS) $(APP_CFLAGS) $(PY_CFLAGS) %f -o %o $(LDFLAGS) $(APP_LDFLAGS) $(PY_LDFLAGS) |> %B.cpython-36m-x86_64-linux-gnu.so
 .gitignore

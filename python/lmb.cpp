@@ -8,7 +8,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include "lmb.hpp"
-#include "gauss.hpp"
+#include "gaussian.hpp"
 #include "gm.hpp"
 #include "models.hpp"
 #include "params.hpp"
@@ -22,7 +22,7 @@ struct HaltException : public std::exception {};
 
 static const int STATES = 4;
 typedef SILMB<GM<STATES>> Tracker;
-typedef GaussianComponent<STATES> Gaussian;
+typedef Gaussian<STATES> Gaussian;
 
 struct alignas(16) TargetSummary {
     typedef TargetSummary Self;
@@ -74,7 +74,7 @@ class PyInterface {
 
         double enof_targets() {
             double res = 0;
-            for(auto& t : lmb.targets.targets) {
+            for(auto& t : lmb.targettree.targets) {
                 res += t->r;
             }
             return res;
@@ -82,7 +82,7 @@ class PyInterface {
 
         unsigned nof_targets(const double r_lim) {
             unsigned res = 0;
-            for(auto& t : lmb.targets.targets) {
+            for(auto& t : lmb.targettree.targets) {
                 if(t->r >= r_lim) { ++res; }
             }
             return res;
@@ -90,7 +90,7 @@ class PyInterface {
 
         Summaries get_targets() {
             Summaries res;
-            for(auto& t : lmb.targets.targets) {
+            for(auto& t : lmb.targettree.targets) {
                 res.emplace_back(t->pdf.mean(), t->pdf.cov(), t->r, t->id);
             }
             return res;
@@ -111,8 +111,7 @@ PYBIND11_MODULE(lmb, m) {
     py::class_<PosSensor>(m, "PositionSensor")
         .def(py::init())
         .def_readwrite("lambdaB", &PosSensor::lambdaB)
-        .def_readwrite("pD", &PosSensor::pD_)
-        .def("set_fov", &PosSensor::set_fov);
+        .def_readwrite("pD", &PosSensor::pD_);
     py::class_<NM<Tracker::Target>>(m, "NM")
         .def(py::init())
         .def(py::init<double, Eigen::Matrix4d>())

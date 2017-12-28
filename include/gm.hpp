@@ -7,24 +7,23 @@
 #include <set>
 #include <vector>
 #include "constants.hpp"
-#include "gauss.hpp"
+#include "gaussian.hpp"
 #include "omp.hpp"
 #include "params.hpp"
 #include "sensors.hpp"
 
 namespace lmb {
-    static const double gmw_lim = 0.05; // FIXME
-
-    template<int S, int MAX_COMPONENTS = 200> // FIXME: Enforce MAX_COMPONENTS
+    template<int S, int MAX_COMPONENTS = 200>
     struct GM {
         static const int STATES = S;
         typedef GM<STATES, MAX_COMPONENTS> Self;
         typedef Eigen::Matrix<double, STATES, 1> State;
         typedef Eigen::Matrix<double, STATES, STATES> Covariance;
-        typedef GaussianComponent<S> GaussianComponent;
+        typedef Gaussian<S> Gaussian;
         Params* params;
 
-        std::vector<GaussianComponent, Eigen::aligned_allocator<GaussianComponent>> c;
+        std::vector<Gaussian, Eigen::aligned_allocator<Gaussian>> c;
+        BBox bbox;
         AABBox aabbox;
         double eta;
 
@@ -47,33 +46,33 @@ namespace lmb {
                 return;
             }
 
+            bbox = BBox(mean().template topLeftCorner<2, 1>(),
+                        cov().template topLeftCorner<2, 2>(),
+                        params->nstd);
+
             aabbox.min[0] = c[0].m(0);
             aabbox.min[1] = c[0].m(1);
             aabbox.max[0] = c[0].m(0);
             aabbox.max[1] = c[0].m(1);
 
             for (unsigned i = 0; i < c.size(); ++i) {
-                Eigen::SelfAdjointEigenSolver<Eigen::Matrix2d> solver(c[i].P.template topLeftCorner<2, 2>());
-                auto l = solver.eigenvalues();
-                auto e = solver.eigenvectors();
+                AABBox cbox(c[i].m.template topLeftCorner<2, 1>(),
+                            c[i].P.template topLeftCorner<2, 2>(),
+                            params->nstd);
 
-                double r1 = params->nstd * std::sqrt(l[0]);
-                double r2 = params->nstd * std::sqrt(l[1]);
-                double theta = std::atan2(e.col(1).y(), e.col(1).x());
-
-                double ux = r1 * std::cos(theta);
-                double uy = r1 * std::sin(theta);
-                double vx = r2 * std::cos(theta + M_PI_2);
-                double vy = r2 * std::sin(theta + M_PI_2);
-
-                auto dx = std::sqrt(ux*ux + vx*vx);
-                auto dy = std::sqrt(uy*uy + vy*vy);
-
-                aabbox.min[0] = std::min(aabbox.min[0], c[i].m(0) - dx);
-                aabbox.min[1] = std::min(aabbox.min[1], c[i].m(1) - dy);
-                aabbox.max[0] = std::max(aabbox.max[0], c[i].m(0) + dx);
-                aabbox.max[1] = std::max(aabbox.max[1], c[i].m(1) + dy);
+                aabbox.min[0] = std::min(aabbox.min[0], cbox.min[0]);
+                aabbox.min[1] = std::min(aabbox.min[1], cbox.min[1]);
+                aabbox.max[0] = std::max(aabbox.max[0], cbox.max[0]);
+                aabbox.max[1] = std::max(aabbox.max[1], cbox.max[1]);
             }
+        }
+
+        bool intersects(const BBox& fov) {
+            return bbox.intersects(fov);
+        }
+
+        bool intersects(const AABBox& fov) {
+            return aabbox.intersects(fov);
         }
 
         void clear() {
@@ -86,19 +85,16 @@ namespace lmb {
 
         GM(Params* params_, const State& mean, const Covariance& cov)
         : params(params_),
-          c({GaussianComponent(1.0, mean, cov)}),
-          aabbox(mean.template topRows<2>(), cov.template topLeftCorner<2, 2>(), params->nstd)
-        {}
+          c({Gaussian(1.0, mean, cov)})
+        {
+            update_bbox();
+        }
 
         template<typename Report, typename Sensor>
         double correct(const Report& z, const Sensor& s) {
+            PARFOR
             for (unsigned i = 0; i < c.size(); ++i) {
-                auto dz = (z.z - s.measurement(c[i].m)).eval();
-                auto Dinv = (s.H * c[i].P * s.H.transpose() + z.R).inverse().eval();
-                auto K = c[i].P * s.H.transpose() * Dinv;
-                c[i].w *= s.pD(c[i].m, c[i].P) * z.likelihood(dz, Dinv) / z.kappa;
-                c[i].m += K * dz;
-                c[i].P -= K * s.H * c[i].P;
+                c[i].correct(z, s);
             }
             normalize();
             return eta;
@@ -107,7 +103,7 @@ namespace lmb {
         template<typename Sensor>
         double missed(const Sensor& s) {
             for (unsigned i = 0; i < c.size(); ++i) {
-                c[i].w *= s.pD(c[i].m, c[i].P);
+                c[i].w *= s.pD(c[i]);
             }
             normalize();
             return 1 - eta;
@@ -147,7 +143,7 @@ namespace lmb {
         }
 
         void prune() {
-            c.erase(std::remove_if(c.begin(), c.end(), [](auto& t) { return t.w < gmw_lim; }), c.end());
+            c.erase(std::remove_if(c.begin(), c.end(), [this](auto& t) { return t.w < params->cw_lim; }), c.end());
             std::sort(std::rbegin(c), std::rend(c));
             if (c.size() > MAX_COMPONENTS) {
                 c.resize(MAX_COMPONENTS);
@@ -175,7 +171,7 @@ namespace lmb {
                 double nw = p.first;
                 wsum += nw;
                 unsigned j = p.second;
-                if (nw / wsum < gmw_lim) {
+                if (nw / wsum < pdf.params->cw_lim) {
                     break;
                 }
                 pdf.c.emplace_back(nw, pdfs[j].c[wi[j]].m, pdfs[j].c[wi[j]].P);

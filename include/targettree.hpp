@@ -75,9 +75,10 @@ namespace lmb {
 #endif
         }
 
-        void query(const AABBox& aabbox, Targets& result) {
-            result.clear();
+        Targets query(const AABBox& aabbox) const {
+            Targets result;
             tree.Search(aabbox.min, aabbox.max, rtree_callback<Target, Targets>, (void*)&result);
+            return result;
         }
     };
 }

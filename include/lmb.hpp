@@ -21,59 +21,56 @@ namespace lmb {
         typedef SILMB<PDF> Self;
         typedef Target<PDF> Target;
         typedef Targets<PDF> Targets;
-        typedef GaussianComponent<PDF::STATES> Gaussian;
+        typedef Gaussian<PDF::STATES> Gaussian;
         typedef Params Params;
 
         Params* params;
 
-        TargetTree<PDF> targets;
+        TargetTree<PDF> targettree;
 
         SILMB(Params* params_) : params(params_) {}
 
 
         template<typename Model>
         void predict(Model& model, double time) {
-            targets.lock();
-            for (auto& t : targets.targets) {
-                targets.remove(t);
+            targettree.lock();
+            for (auto& t : targettree.targets) {
+                targettree.remove(t);
             }
-            targets.unlock();
+            targettree.unlock();
 
             PARFOR
-            for (auto t = std::begin(targets.targets); t < std::end(targets.targets); ++t) {
-                //std::cout << "Before (" << (*t)->id << "): " << (*t)->pdf.mean().format(eigenformat) << std::endl;
+            for (auto t = std::begin(targettree.targets); t < std::end(targettree.targets); ++t) {
                 (*t)->template predict<Model>(model, time);
-                //std::cout << "After  (" << (*t)->id << "): " << (*t)->pdf.mean().format(eigenformat) << std::endl;
             }
 
-            targets.lock();
-            for (auto& t : targets.targets) {
-                targets.replace(t);
+            targettree.lock();
+            for (auto& t : targettree.targets) {
+                targettree.replace(t);
             }
-            targets.unlock();
+            targettree.unlock();
         }
 
         template<typename Model>
         void predict(Model& model, const AABBox& aabbox, double time) {
-            Targets all_targets;
-            targets.query(aabbox, all_targets);
+            auto all_targets = targettree.query(aabbox);
 
-            targets.lock();
+            targettree.lock();
             for (auto& t : all_targets) {
-                targets.remove(t);
+                targettree.remove(t);
             }
-            targets.unlock();
+            targettree.unlock();
 
             PARFOR
             for (auto t = std::begin(all_targets); t < std::end(all_targets); ++t) {
                 (*t)->template predict<Model>(model, time);
             }
 
-            targets.lock();
+            targettree.lock();
             for (auto& t : all_targets) {
-                targets.replace(t);
+                targettree.replace(t);
             }
-            targets.unlock();
+            targettree.unlock();
         }
 
         template<typename Report>
@@ -85,7 +82,7 @@ namespace lmb {
             std::map<Report*, Targets> matching_targets;
             std::map<Target*, Reports> matching_reports;
             for (auto& r : reports) {
-                targets.query(r.aabbox, matching_targets[&r]);
+                matching_targets[&r] = targettree.query(r.aabbox);
                 for (auto t : matching_targets[&r]) {
                     matching_reports[t].push_back(&r);
                 }
@@ -141,9 +138,7 @@ namespace lmb {
         template<typename Report, typename Sensor>
         void correct(std::vector<Report>& reports, const Sensor& sensor, double time) {
             Clusters<Report, Target> clusters;
-            Targets all_targets;
-            targets.query(sensor.aabbox, all_targets);
-            //sensor.fov_filter(all_targets); // FIXME
+            auto all_targets = sensor.get_targets(targettree);
 
             cluster(reports, all_targets, clusters);
 
@@ -158,17 +153,13 @@ namespace lmb {
         template<typename Report, typename Sensor>
         void birth(const std::vector<Report>& reports, Sensor& sensor, double time) {
             double rBsum = std::accumulate(std::begin(reports), std::end(reports), 0.0, [](double s, const Report& r) { return s + r.rB; });
-            //std::cout << "rBsum: " << std::accumulate(std::begin(reports), std::end(reports), 0.0, [](double s, const Report& r) { return s + r.rB; }) << std::endl;
 
             if (rBsum >= params->r_lim) {
                 PARFOR
                 for (auto r = std::begin(reports); r < std::end(reports); ++r) {
                     double nr = r->rB * sensor.lambdaB / rBsum;
-                    //std::cout << "nr: " << nr << std::endl;
-                    //std::cout << "r_lim: " << params->r_lim << std::endl;
                     if (nr >= params->r_lim) {
-                        //std::cout << "New target: " << nr << std::endl;
-                        targets.new_target(std::min(nr, params->rB_max), sensor.pdf(params, *r), time);
+                        targettree.new_target(std::min(nr, params->rB_max), sensor.pdf(params, *r), time);
                     }
                 }
             }
@@ -191,9 +182,6 @@ namespace lmb {
                 c.targets[i]->match(c.reports, sensor, C.block(i, 0, 1, M), C(i, M + i));
                 C(i, M + N + i) = c.targets[i]->false_target();
             }
-
-            //std::cout << "N: " << N << "  M: " << M << std::endl;
-            //std::cout << "C:" << std::endl << C << std::endl;
 
             Murty murty(C);
             Assignment res;
@@ -228,23 +216,22 @@ namespace lmb {
             }
 
             R /= w_sum;
-            //std::cout << "R: " << std::endl << R << std::endl;
 
-            targets.lock();
+            targettree.lock();
             for (unsigned i = 0; i < N; ++i) {
-                targets.remove(c.targets[i]);
+                targettree.remove(c.targets[i]);
             }
-            targets.unlock();
+            targettree.unlock();
 
             for (unsigned i = 0; i < N; ++i) {
                 c.targets[i]->correct(R.row(i));
             }
 
-            targets.lock();
+            targettree.lock();
             for (unsigned i = 0; i < N; ++i) {
-                targets.replace(c.targets[i]);
+                targettree.replace(c.targets[i]);
             }
-            targets.unlock();
+            targettree.unlock();
 
             auto rB = (1.0 - R.colwise().sum().array()).eval();
             for (unsigned j = 0; j < M; ++j) {
@@ -255,7 +242,7 @@ namespace lmb {
         void repr(std::ostream& os) const {
             os << "{\"targets\":[";
             bool first = true;
-            for (auto& t : targets.targets) {
+            for (auto& t : targettree.targets) {
                 if (!first) { os << ","; } else { first = false; }
                 os << *t;
             }

@@ -62,7 +62,7 @@ class Application:
         """Run application."""
         _LOGGER.debug("Starting application.")
         plt.figure(figsize=(10, 10))
-        model = lmb.CV(0.9, 0.5)
+        model = lmb.CV(0.9, 1.5)
         sensor = lmb.PositionSensor()
         sensor.lambdaB = 2
         sensor.pD = 0.8
@@ -85,31 +85,30 @@ class Application:
                 # print("Predicted: ", tracker_targets)
                 for target in targets:
                     target[0:2] += target[2:]
-            # if k == 5:
-                # targets.append(np.array([5.0, 5.0, 1.0, 0.0]))
-            # if k % 7 == 0:
-                # targets.append(np.random.multivariate_normal(
-                    # np.array([k, 7.0, 0.0, 0.0]),
-                    # np.diag([1, 0.5, 1, 1])))
-            # if k % 9 == 1:
-                # del targets[-1]
-            # if k == 10:
-                # targets.append(np.array([10.0, -30.0, 1.0, -0.5]))
-            # if k == 20:
-                # targets.append(np.array([k, 0.0, 1.0, 4.0]))
+            if k == 5:
+                targets.append(np.array([5.0, 5.0, 1.0, 0.0]))
+            if k % 7 == 0:
+                targets.append(np.random.multivariate_normal(
+                    np.array([k, 7.0, 0.0, 0.0]),
+                    np.diag([1, 0.5, 1, 1])))
+            if k % 9 == 1:
+                del targets[-1]
+            if k == 10:
+                targets.append(np.array([10.0, -30.0, 1.0, -0.5]))
+            if k == 20:
+                targets.append(np.array([k, 0.0, 1.0, 4.0]))
 
             reports = [lmb.GaussianReport(
                 # np.random.multivariate_normal(t[0:2], np.diag([0.01] * 2)),  # noqa
                 t[0:2, np.newaxis],
-                np.eye(2) * 0.5, 0.001)
+                np.eye(2) * 0.5, 0.01)
                        for i, t in enumerate(targets)]
             sensor.lambdaB = 0.1 * len(reports)
             await self.correct(sensor, reports)
             tracker_targets = await self.get_targets()
-            # print("Corrected: ", tracker_targets)
             history.append((k, tracker_targets))
             ntargets.append(await self.enof_targets())
-            ntargets_verified.append(await self.nof_targets(0.7))
+            ntargets_verified.append(await self.nof_targets(0.9))
             ntargets_true.append(len(targets))
             plot.plot_scan(reports)
             plt.plot([t[0] for t in targets],

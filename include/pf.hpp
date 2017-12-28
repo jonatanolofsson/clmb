@@ -7,6 +7,7 @@
 #include <queue>
 #include <set>
 #include <vector>
+#include "bbox.hpp"
 #include "constants.hpp"
 #include "omp.hpp"
 #include "params.hpp"
@@ -16,7 +17,16 @@
 #include <iostream>
 
 namespace lmb {
-    static const double pfw_lim = 0.05; // FIXME
+    template<typename T>
+    struct Particle {
+        const T& p;
+
+        Particle(const T& p_) : p(p_) {}
+
+        double overlap(const BBox& bbox) const {
+            return (double)bbox.within(p);
+        }
+    };
 
     template<unsigned S, unsigned N = 200000>
     struct PF {
@@ -29,6 +39,7 @@ namespace lmb {
         typedef Eigen::Array<double, 1, Eigen::Dynamic> Weights;
         Params* params;
 
+        BBox bbox;
         AABBox aabbox;
         double eta;
         Weights w;
@@ -75,7 +86,7 @@ namespace lmb {
             PARFOR
             for(unsigned i = 0; i < N; ++i) {
                 auto dz = (z.z - s.measurement(x.col(i).matrix())).eval();
-                w[i] *= s.pD(x.col(i)) * z.likelihood(dz, Dinv) / z.kappa;
+                w[i] *= s.pD(Particle(x.col(i))) * z.likelihood(dz, Dinv) / z.kappa;
             }
             normalize();
             return eta;
@@ -91,21 +102,20 @@ namespace lmb {
             update_bbox();
         }
 
-        void update_bbox(const double lim=0.01) {  // FIXME: Change to nstd
+        void update_bbox() {
             if (!valid) { return; }
+            bbox.from_gaussian(mean().template topLeftCorner<2, 1>(),
+                               cov().template topLeftCorner<2, 2>(),
+                               params->nstd);
+            aabbox = bbox.aabbox();
+        }
 
-            aabbox.min[0] = std::numeric_limits<double>::infinity();
-            aabbox.min[1] = std::numeric_limits<double>::infinity();
-            aabbox.max[0] = -std::numeric_limits<double>::infinity();
-            aabbox.max[1] = -std::numeric_limits<double>::infinity();
+        bool intersects(const BBox& fov) {
+            return bbox.intersects(fov);
+        }
 
-            for(unsigned i = 0; i < N; ++i) {
-                if (w[i] < lim) { continue; }
-                aabbox.min[0] = std::min(aabbox.min[0], x(0, i));
-                aabbox.min[1] = std::min(aabbox.min[1], x(1, i));
-                aabbox.max[0] = std::max(aabbox.max[0], x(0, i));
-                aabbox.max[1] = std::max(aabbox.max[1], x(1, i));
-            }
+        bool intersects(const AABBox& fov) {
+            return aabbox.intersects(fov);
         }
 
         double neff() const {
@@ -140,7 +150,7 @@ namespace lmb {
         double missed(const Sensor& s) {
             PARFOR
             for(unsigned i = 0; i < N; ++i) {
-                w[i] *= s.pD(x.col(i));
+                w[i] *= s.pD(Particle(x.col(i)));
             }
             normalize();
             return 1 - eta;

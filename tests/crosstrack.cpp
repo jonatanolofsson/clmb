@@ -26,7 +26,7 @@ int main() {
             GaussianReport(Eigen::Vector2d({t, t}), P, kappa),
             GaussianReport(Eigen::Vector2d({t, 10 - t}), P, kappa)
         });
-        lmb.predict<CV<Tracker::Target>>(model, s.aabbox, t);
+        lmb.predict<CV<Tracker::Target>>(model, s.fov.aabbox(), t);
         lmb.correct(zs, s, t);
         std::cout << "{\"t\":" << t << ",\"scan\":" << zs << ",\"post\":" << lmb << "}" << std::endl;
     }

@@ -1,6 +1,6 @@
 #pragma once
 #include "bbox.hpp"
-#include "gauss.hpp"
+#include "gaussian.hpp"
 #include <iostream>
 
 namespace lmb {
@@ -15,7 +15,7 @@ namespace lmb {
         typedef PDF_ PDF;
         typedef Target<PDF> Self;
         typedef std::vector<Self*> Targets;
-        typedef GaussianComponent<PDF::STATES> Gaussian;
+        typedef Gaussian<PDF::STATES> Gaussian;
         unsigned id;
         double r;
         PDF pdf;

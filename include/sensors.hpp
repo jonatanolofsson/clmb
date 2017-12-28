@@ -5,6 +5,8 @@
 #include <algorithm>
 #include "bbox.hpp"
 #include "constants.hpp"
+#include "target.hpp"
+#include "targettree.hpp"
 
 namespace lmb {
     struct alignas(16) GaussianReport {
@@ -54,12 +56,13 @@ namespace lmb {
         return os;
     }
 
+
     template<typename Target>
     struct PositionSensor {
         typedef PositionSensor<Target> Self;
         typedef Eigen::Matrix<double, 2, Target::PDF::STATES> ObservationMatrix;
+        typedef Targets<typename Target::PDF> Targets;
         inline static const ObservationMatrix H = ObservationMatrix::Identity();
-        AABBox aabbox;
         BBox fov;
         Eigen::Matrix2d pv;
         double lambdaB = 1.0;
@@ -69,35 +72,24 @@ namespace lmb {
         : pv(Eigen::Matrix2d::Identity() * 10)
         {}
 
-        void set_fov(const BBox& f) {
-            fov = f;
-            aabbox = fov.aabbox();
-        }
-
         template<typename States>
         auto measurement(const States& m) const {
             return H * m;
         }
 
-        template<typename S, typename C>
-        double pD(const S&, const C&) const {
-            // FIXME
-            return pD_;
+        template<typename PDF>
+        double pD(const PDF& pdf) const {
+            return pD_ * pdf.overlap(fov);
         }
 
-        template<typename S>
-        double pD(const S&) const {
-            // FIXME
-            return pD_;
-        }
-
-        template<typename Targets>
-        void fov_filter(Targets& targets) const {
+        Targets get_targets(const TargetTree<typename Target::PDF>& targettree) const {
             Targets result;
+            auto targets = targettree.query(fov.aabbox());
             result.reserve(targets.size());
             std::copy_if(targets.begin(), targets.end(), result.begin(),
-                         [this](typename Targets::value_type t) { return fov.intersects(t->pdf.aabbox); });
-            targets.swap(result);
+                         [this](typename Targets::value_type t) { return t->pdf.intersects(fov); });
+            result.shrink_to_fit();
+            return result;
         }
 
         template<typename Report>

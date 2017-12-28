@@ -19,10 +19,10 @@ TEST(LMBTests, ConstructLMB) {
     std::vector<GaussianReport> zs({z});
     PositionSensor<Filter::Target> s;
     lmb.correct(zs, s, 1);
-    ASSERT_EQ(lmb.targets.targets.size(), 1);
-    EXPECT_EQ(lmb.targets.targets[0]->id, 0);
-    EXPECT_FLOAT_EQ(lmb.targets.targets[0]->r, params.rB_max);
-    auto mean = lmb.targets.targets[0]->pdf.mean();
+    ASSERT_EQ(lmb.targettree.targets.size(), 1);
+    EXPECT_EQ(lmb.targettree.targets[0]->id, 0);
+    EXPECT_FLOAT_EQ(lmb.targettree.targets[0]->r, params.rB_max);
+    auto mean = lmb.targettree.targets[0]->pdf.mean();
     EXPECT_FLOAT_EQ(mean[0], 1);
     EXPECT_FLOAT_EQ(mean[1], 1);
 }
@@ -41,8 +41,8 @@ TEST(LMBTests, RunLMB) {
         m = Eigen::Vector2d({t, t});
         z.reset();
         lmb.correct(zs, s, t);
-        std::cout << "Targets: " << lmb.targets.targets.size() << std::endl;
-        for (auto& t : lmb.targets.targets) {
+        std::cout << "Targets: " << lmb.targettree.targets.size() << std::endl;
+        for (auto& t : lmb.targettree.targets) {
             std::cout << "\n\tTarget " << t->id << " (" << t << ")" << std::endl;
             std::cout << "\t\tWeight: " << t->r << std::endl;
             std::cout << "\t\tMean: " << t->pdf.mean().transpose() << std::endl;
@@ -50,5 +50,5 @@ TEST(LMBTests, RunLMB) {
             std::cout << "\t\tCov: " << std::endl << t->pdf.cov() << std::endl;
         }
     }
-    ASSERT_EQ(lmb.targets.targets.size(), 2);
+    ASSERT_EQ(lmb.targettree.targets.size(), 2);
 }
