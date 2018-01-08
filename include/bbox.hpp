@@ -82,7 +82,7 @@ namespace lmb {
     }
 
     struct BBox {
-        typedef Eigen::Matrix<double, 2, 4> Corners;
+        using Corners = Eigen::Matrix<double, 2, 4>;
         Corners corners;
 
         BBox(const Corners& c)

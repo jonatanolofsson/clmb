@@ -32,21 +32,18 @@ PY_LDFLAGS = -L/usr/lib -lpython3.6m -lpthread -ldl  -lutil -lm  -Xlinker -expor
 
 TEST_LDFLAGS  = -lgtest_main -lgtest
 
+ifdef COVERAGE
 COV_CFLAGS  = -fprofile-arcs
 COV_CFLAGS += -ftest-coverage
 COV_CFLAGS += -fprofile-instr-generate -fcoverage-mapping
 COV_LDFLAGS = -lgcov
 COV_OUT = %B.gcno
 COV_RUNOUT = %B.gcda %B.profraw
+endif
 
 COMPILER = clang++ -Qunused-arguments
 ifdef USE_GCC
     COMPILER = g++
 endif
 
-!cc = |> $(COMPILER) $(CFLAGS) $(COV_CFLAGS) -c %f -o %o |> %B.o | $(COV_OUT)
-!ar = |> ar crs %o %f |>
-
-!appcc = |> $(COMPILER) $(CFLAGS) $(APP_CFLAGS) %f -o %o $(LDFLAGS) $(APP_LDFLAGS) |> %B
-!pycc = |> $(COMPILER) $(CFLAGS) $(APP_CFLAGS) $(PY_CFLAGS) %f -o %o $(LDFLAGS) $(APP_LDFLAGS) $(PY_LDFLAGS) |> %B.cpython-36m-x86_64-linux-gnu.so
 .gitignore

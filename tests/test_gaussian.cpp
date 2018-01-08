@@ -6,9 +6,9 @@
 using namespace lmb;
 
 TEST(GaussianTests, Correct) {
-    typedef Gaussian<4> PDF;
-    typedef Target<PDF> Target;
-    PDF pdf(1.0, {0, 0, 0, 0}, PDF::Covariance::Identity());
+    using PDF = Gaussian_<4>;
+    using Target = Target_<PDF>;
+    PDF pdf({0, 0, 0, 0}, PDF::Covariance::Identity(), 1.0);
     auto mr = pdf.mean();
     auto Pr = pdf.cov();
     EXPECT_NEAR(mr[0], 0, 1e-2);

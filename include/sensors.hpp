@@ -10,9 +10,9 @@
 
 namespace lmb {
     struct alignas(16) GaussianReport {
-        typedef GaussianReport Self;
-        typedef Eigen::Matrix<double, Eigen::Dynamic, 1> Measurement;
-        typedef Eigen::MatrixXd Covariance;
+        using Self = GaussianReport;
+        using Measurement = Eigen::Matrix<double, Eigen::Dynamic, 1>;
+        using Covariance = Eigen::MatrixXd;
         Measurement z;
         Covariance R;
         double kappa;
@@ -59,9 +59,10 @@ namespace lmb {
 
     template<typename Target>
     struct PositionSensor {
-        typedef PositionSensor<Target> Self;
-        typedef Eigen::Matrix<double, 2, Target::PDF::STATES> ObservationMatrix;
-        typedef Targets<typename Target::PDF> Targets;
+        using Self = PositionSensor<Target>;
+        using Report = GaussianReport;
+        using ObservationMatrix = Eigen::Matrix<double, 2, Target::PDF::STATES>;
+        using Targets = Targets_<typename Target::PDF>;
         inline static const ObservationMatrix H = ObservationMatrix::Identity();
         BBox fov;
         Eigen::Matrix2d pv;

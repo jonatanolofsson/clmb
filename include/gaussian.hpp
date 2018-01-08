@@ -6,23 +6,23 @@
 
 namespace lmb {
     template<int S>
-    struct alignas(16) Gaussian {
+    struct alignas(16) Gaussian_ {
         static const int STATES = S;
-        typedef Gaussian<S> Self;
-        typedef Eigen::Matrix<double, STATES, 1> State;
-        typedef Eigen::Matrix<double, STATES, STATES> Covariance;
+        using Self = Gaussian_<S>;
+        using State = Eigen::Matrix<double, STATES, 1>;
+        using Covariance = Eigen::Matrix<double, STATES, STATES>;
         State m;
         Covariance P;
         double w;
 
-        Gaussian(double w_, const State& m_, const Covariance& P_)
+        Gaussian_(const State& m_, const Covariance& P_, double w_=1.0)
         : m(m_),
           P(P_),
           w(w_)
         {}
 
-        template<typename Report, typename Sensor>
-        double correct(const Report& z, const Sensor& s) {
+        template<typename Sensor>
+        double correct(const typename Sensor::Report& z, const Sensor& s) {
             auto dz = (z.z - s.measurement(m)).eval();
             auto Dinv = (s.H * P * s.H.transpose() + z.R).inverse().eval();
             auto K = P * s.H.transpose() * Dinv;
@@ -33,7 +33,7 @@ namespace lmb {
             return w;
         }
 
-        bool operator<(const Gaussian& b) const {
+        bool operator<(const Gaussian_& b) const {
             return w < b.w;
         }
 
@@ -51,7 +51,7 @@ namespace lmb {
         }
 
         double overlap(const BBox& bbox) const {
-            static const int N = 10000;
+            static const int N = 10000;  // FIXME
             Eigen::Matrix<double, S, Eigen::Dynamic> samples(S, N);
             sample(samples);
             int nwithin = 0;
@@ -70,7 +70,7 @@ namespace lmb {
     };
 
     template<int S>
-    auto& operator<<(std::ostream& os, const Gaussian<S> c) {
+    auto& operator<<(std::ostream& os, const Gaussian_<S> c) {
         c.repr(os);
         return os;
     }

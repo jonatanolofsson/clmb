@@ -7,8 +7,8 @@
 using namespace lmb;
 
 TEST(PFTests, Correct) {
-    typedef PF<4, 500000> PDF;
-    typedef Target<PDF> Target;
+    using PDF = PF<4, 500000>;
+    using Target = Target_<PDF>;
     Params params;
     PDF pdf(&params, {0, 0, 0, 0}, PDF::Covariance::Identity());
     auto mr = pdf.mean();

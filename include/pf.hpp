@@ -32,11 +32,11 @@ namespace lmb {
     struct PF {
         static const unsigned STATES = S;
         static const unsigned PARTICLES = N;
-        typedef PF<S, PARTICLES> Self;
-        typedef Eigen::Matrix<double, STATES, 1> State;
-        typedef Eigen::Matrix<double, STATES, STATES> Covariance;
-        typedef Eigen::Array<double, STATES, Eigen::Dynamic> States;
-        typedef Eigen::Array<double, 1, Eigen::Dynamic> Weights;
+        using Self = PF<S, PARTICLES>;
+        using State = Eigen::Matrix<double, STATES, 1>;
+        using Covariance = Eigen::Matrix<double, STATES, STATES>;
+        using States = Eigen::Array<double, STATES, Eigen::Dynamic>;
+        using Weights = Eigen::Array<double, 1, Eigen::Dynamic>;
         Params* params;
 
         BBox bbox;
@@ -80,8 +80,8 @@ namespace lmb {
             }
         }
 
-        template<typename Measurement, typename Sensor>
-        double correct(const Measurement& z, const Sensor& s) {
+        template<typename Sensor>
+        double correct(const typename Sensor::Report& z, const Sensor& s) {
             auto Dinv = z.R.inverse().eval();
             PARFOR
             for(unsigned i = 0; i < N; ++i) {

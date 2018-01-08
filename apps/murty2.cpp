@@ -3,14 +3,8 @@
 #include <chrono>
 
 using namespace lmb;
-typedef std::chrono::high_resolution_clock Clock;
+using Clock = std::chrono::high_resolution_clock;
 
-//Eigen::MatrixXd MURTY_COST = (Eigen::MatrixXd(5, 10) <<
-              //7, 51, 52, 87, 38, 60, 74, 66, 0, 20,
-              //50, 12, 0, 64, 8, 53, 0, 46, 76, 42,
-              //27, 77, 0, 18, 22, 48, 44, 13, 0, 57,
-              //62, 0, 3, 8, 5, 6, 14, 0, 26, 39,
-              //0, 97, 0, 5, 13, 0, 41, 31, 62, 48).finished();
 Eigen::MatrixXd MURTY_COST = (Eigen::MatrixXd(10, 10) <<
               7, 51, 52, 87, 38, 60, 74, 66, 0, 20,
               50, 12, 0, 64, 8, 53, 0, 46, 76, 42,
@@ -23,22 +17,18 @@ Eigen::MatrixXd MURTY_COST = (Eigen::MatrixXd(10, 10) <<
               56, 10, 45, 39, 0, 93, 67, 79, 19, 38,
               27, 0, 39, 53, 46, 24, 69, 46, 23, 1).finished();
 
-
 int main() {
-    Murty m(MURTY_COST);
+    std::srand(0);
+    Murty m(MURTY_COST.block<6, 6>(0, 0));
     Assignment res;
     double cost;
     unsigned n = 0;
     auto t1 = Clock::now();
     while(m.draw(res, cost)) {
-        //std::cout << "[" << res.transpose() << "] " << cost << std::endl;
+        std::cout << cost << " [" << res.transpose() << "]" << std::endl;
         ++n;
     }
     auto t2 = Clock::now();
     std::cout << "Drew " << n << " in " << std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count() / 1000.0 << " s" << std::endl;
-    //for (int n = 0; n < 10; ++n) {
-        //m.draw(res, cost);
-        //std::cout << "res: [" << res.transpose() << "] " << cost << std::endl;
-    //}
     return 0;
 }

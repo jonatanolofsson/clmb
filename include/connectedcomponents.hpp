@@ -6,9 +6,9 @@
 namespace lmb {
     template<typename T>
     struct ConnectedComponents {
-        typedef std::vector<T*> Connections;
-        typedef std::set<T*> CSet;
-        typedef std::map<T*, CSet> CMap;
+        using Connections = std::vector<T*>;
+        using CSet = std::set<T*>;
+        using CMap = std::map<T*, CSet>;
         CMap connections;
 
         void init(T* const k) {

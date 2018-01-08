@@ -13,9 +13,9 @@ namespace lmb {
 
     template<typename PDF>
     struct TargetTree {
-        typedef TargetTree<PDF> Self;
-        typedef lmb::Target<PDF> Target;
-        typedef lmb::Targets<PDF> Targets;
+        using Self = TargetTree<PDF>;
+        using Target = lmb::Target_<PDF>;
+        using Targets = lmb::Targets_<PDF>;
 
         Targets targets;
         RTree<Target*, double, 2> tree;

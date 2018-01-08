@@ -13,7 +13,7 @@
 
 namespace lmb {
     using namespace lap;
-    typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> CostMatrix;
+    using CostMatrix = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>;
 
     class EmptyQueue: public std::exception {
     public:
@@ -71,7 +71,7 @@ namespace lmb {
 
 
     struct MurtyState {
-        typedef std::vector<std::tuple<double, unsigned, unsigned>> Slacklist;
+        using Slacklist = std::vector<std::tuple<double, unsigned, unsigned>>;
         Eigen::MatrixXd C;
         Slack u, v;
         double cost;
@@ -185,7 +185,7 @@ namespace lmb {
         }
     };
 
-    typedef std::shared_ptr<MurtyState> MurtyStatePtr;
+    using MurtyStatePtr = std::shared_ptr<MurtyState>;
     struct MurtyStatePtrCompare {
         bool operator()(const MurtyStatePtr& a, const MurtyStatePtr& b) {
             if (a->cost > b->cost) {

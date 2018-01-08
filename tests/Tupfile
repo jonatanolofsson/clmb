@@ -2,11 +2,13 @@ include_rules
 
 !testcc = |> $(COMPILER) $(CFLAGS) $(COV_CFLAGS) $(TEST_CFLAGS) %f -o %o $(LDFLAGS) $(TEST_LDFLAGS) |> %B | $(COV_OUT)
 !testrun = |> LLVM_PROFILE_FILE=%f.profraw ./%f > %o |> %f.output | $(COV_RUNOUT)
-!profiles = |> llvm-profdata merge -sparse %f -o %o |>
-!coverage = |>  |>
 
 :foreach *.cpp |> !testcc |> {tests}
 :foreach {tests} |> !testrun |>
+
+ifdef COVERAGE
+!profiles = |> llvm-profdata merge -sparse %f -o %o |>
 : *.profraw |> !profiles |> default.profdata
 : {tests} | default.profdata |> llvm-cov show %f -instr-profile=default.profdata > %o |> tests.coverage
 : {tests} | default.profdata |> llvm-cov report %f -instr-profile=default.profdata > %o |> tests.report
+endif

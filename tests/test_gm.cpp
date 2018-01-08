@@ -7,8 +7,8 @@
 using namespace lmb;
 
 TEST(GMTests, Correct) {
-    typedef GM<4> PDF;
-    typedef Target<PDF> Target;
+    using PDF = GM<4>;
+    using Target = Target_<PDF>;
     Params params;
     PDF pdf(&params, {0, 0, 0, 0}, PDF::Covariance::Identity());
     auto mr = pdf.mean();
@@ -34,7 +34,7 @@ TEST(GMTests, Correct) {
 }
 
 TEST(GMTests, Copy) {
-    typedef GM<2> PDF;
+    using PDF = GM<2>;
     Params params;
     PDF pdf(&params, {0, 0}, PDF::Covariance::Identity());
     PDF pdf2(pdf);
