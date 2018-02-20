@@ -4,6 +4,7 @@
 #include "target.hpp"
 
 using namespace lmb;
+using GaussianReport = GaussianReport_<2>;
 
 TEST(SensorTests, Likelihood) {
     auto m = Eigen::Vector2d({1, 1});

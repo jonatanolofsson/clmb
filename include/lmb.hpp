@@ -10,6 +10,8 @@
 #include <string>
 #include <vector>
 #include "bbox.hpp"
+#include "cf.hpp"
+#include "cluster.hpp"
 #include "connectedcomponents.hpp"
 #include "lap.hpp"
 #include "murty.hpp"
@@ -21,6 +23,9 @@
 
 namespace lmb {
 
+using lap::Murty;
+using lap::Assignment;
+
 template<typename PDF_>
 class SILMB {
  public:
@@ -28,6 +33,7 @@ class SILMB {
     using Self = SILMB<PDF>;
     using Target = Target_<PDF>;
     using Targets = Targets_<PDF>;
+    using TargetTree = TargetTree_<PDF>;
     using Gaussian = Gaussian_<PDF::STATES>;
     using TargetStates = std::vector<typename PDF::State>;
     using TargetSummaries = TargetSummaries_<PDF::STATES>;
@@ -35,7 +41,7 @@ class SILMB {
 
     Params params;
 
-    TargetTree<PDF> targettree;
+    TargetTree targettree;
 
     SILMB() {}
 
@@ -44,6 +50,7 @@ class SILMB {
 
     template<typename Model>
     void predict(Model& model, double time) {
+        //std::cout << "\n\nPredict::::::::::" << std::endl;
         targettree.lock();
         for (auto& t : targettree.targets) {
             targettree.remove(t);
@@ -53,7 +60,13 @@ class SILMB {
         PARFOR
         for (auto t = std::begin(targettree.targets);
                 t < std::end(targettree.targets); ++t) {
+            //std::cout << "Pre-local: " << **t << std::endl;
+            (*t)->transform_to_local();
+            //std::cout << "Post-local: " << **t << std::endl;
             (*t)->template predict<Model>(model, time);
+            //std::cout << "Pre-global: " << **t << std::endl;
+            (*t)->transform_to_global();
+            //std::cout << "Post-global: " << **t << std::endl;
         }
 
         targettree.lock();
@@ -63,42 +76,53 @@ class SILMB {
         targettree.unlock();
     }
 
-    template<typename Model>
-    void predict(Model& model, const AABBox& aabbox, double time) {
-        auto all_targets = targettree.query(aabbox);
+    //template<typename Model>
+    //void predict(Model& model, const AABBox& aabbox, double time) {
+        //auto all_targets = targettree.query(aabbox);
 
-        targettree.lock();
-        for (auto& t : all_targets) {
-            targettree.remove(t);
-        }
-        targettree.unlock();
+        //targettree.lock();
+        //for (auto& t : all_targets) {
+            //targettree.remove(t);
+        //}
+        //targettree.unlock();
 
-        PARFOR
-        for (auto t = std::begin(all_targets); t < std::end(all_targets); ++t) {
-            (*t)->template predict<Model>(model, time);
-        }
+        //PARFOR
+        //for (auto t = std::begin(all_targets); t < std::end(all_targets); ++t) {
+            //(*t)->template predict<Model>(model, time);
+        //}
 
-        targettree.lock();
-        for (auto& t : all_targets) {
-            targettree.replace(t);
-        }
-        targettree.unlock();
-    }
+        //targettree.lock();
+        //for (auto& t : all_targets) {
+            //targettree.replace(t);
+        //}
+        //targettree.unlock();
+    //}
 
     template<typename Sensor>
-    void correct(std::vector<typename Sensor::Report>& reports, const Sensor& sensor, double time) {
+    void correct(typename Sensor::Scan& scan, const Sensor& sensor, double time) {  // NOLINT
         using Report = typename Sensor::Report;
-        Clusters<Report> clusters;
-        auto all_targets = sensor.get_targets(targettree);
+        using Cluster = Cluster_<Report, Target>;
+        using Clusters = typename std::vector<Cluster>;
+        //std::cout << "\n\nCorrect::::::::::" << std::endl;
 
-        cluster(reports, all_targets, clusters);
+        //std::cout << "FOV: " << sensor.fov.aabbox() << std::endl;
+        auto affected_targets = sensor.get_targets(targettree);
+        //std::cout << "Affected targets: " << affected_targets.size() << std::endl;
+        //std::cout << "All targets: " << std::endl;
+        //for (auto& t : targettree.targets) {
+            //std::cout << "\t" << *t << ": " << t->llaabbox() << std::endl;
+        //}
+
+        Clusters clusters;
+        cluster<Sensor>(scan, affected_targets, clusters);
 
         PARFOR
         for (auto c = std::begin(clusters); c < std::end(clusters); ++c) {
-            cluster_correct<Report, Sensor>(*c, sensor);
+            cluster_correct<Sensor>(*c, sensor);
         }
 
-        birth(reports, sensor, time);
+        // Reports have now moved to their respective clusters' NE system
+        birth(clusters, scan, sensor, time);
     }
 
     double enof_targets() {
@@ -125,7 +149,10 @@ class SILMB {
         TargetSummaries res;
         targettree.lock();
         for (auto& t : targettree.targets) {
-            res.emplace_back(t->pdf.mean(), t->pdf.cov(), t->r, t->id);
+            res.emplace_back(t->pdf.mean(),
+                             t->pdf.cov(),
+                             t->r,
+                             t->id);
         }
         targettree.unlock();
         return res;
@@ -197,52 +224,50 @@ class SILMB {
     }
 
  private:
-    template<typename Report>
-    struct Cluster {
-        using Self = Cluster<Report>;
-        using Clusters = std::vector<Self>;
-        using Reports = std::vector<Report*>;
-        using Targets = std::vector<Target*>;
-
-        Reports reports;
-        Targets targets;
-
-        Cluster(const Reports& reports_, const Targets& targets_)
-        : reports(reports_),
-          targets(targets_)
-        {}
-    };
-
-    template<typename Report> using Clusters =
-        typename Cluster<Report>::Clusters;
-
-    template<typename Report>
-    void cluster(std::vector<Report>& reports,
+    template<typename Sensor, typename Clusters>
+    void cluster(typename Sensor::Scan& scan,
                  Targets& all_targets,
-                 Clusters<Report>& clusters) {
+                 Clusters& clusters) {
+        using Report = typename Sensor::Report;
         using Reports = std::vector<Report*>;
+        //std::cout << "Clustering reports: " << scan << std::endl;
+        //std::cout << "Clustering targets: " << std::endl;
+        //for (auto& t : all_targets) {
+            //std::cout << "\t" << t << ": " << *t << std::endl;
+        //}
+        // Clustering is performed in the LL CF
         Targets c;
         clusters.clear();
         ConnectedComponents<Report> cc;
         std::map<Report*, Targets> matching_targets;
         std::map<Target*, Reports> matching_reports;
-        for (auto& r : reports) {
-            matching_targets[&r] = targettree.query(r.aabbox);
-            for (auto t : matching_targets[&r]) {
-                matching_reports[t].push_back(&r);
+
+        // Match reports to potential target matches
+        for (auto r = std::begin(scan); r != std::end(scan); ++r) {
+            matching_targets[&(*r)] = targettree.query(r->llaabbox());
+            for (auto t = std::begin(matching_targets[&(*r)]); t != std::end(matching_targets[&(*r)]); ++t) {  // NOLINT
+                matching_reports[*t].push_back(&(*r));
+                //std::cout << "Report matched target: " << *r << " <-> " << **t << std::endl;
             }
         }
 
-        for (auto& r : reports) {
-            cc.init(&r);
-            for (auto t : matching_targets[&r]) {
-                cc.connect(&r, matching_reports[t]);
+        // Connect targets related by ambiguous reports
+        for (auto r = std::begin(scan); r != std::end(scan); ++r) {
+            cc.init(&(*r));
+            for (auto t = std::begin(matching_targets[&(*r)]); t != std::end(matching_targets[&(*r)]); ++t) {  // NOLINT
+                cc.connect(&(*r), matching_reports[*t]);
+                //std::cout << "Connecting: " << *r << " <-> " << **t << std::endl;
             }
         }
 
         Reports cluster_reports;
         unsigned cluster_id = 1;
         while (cc.get_component(cluster_reports)) {
+            //std::cout << "Cluster: " << std::endl;
+            //std::cout << "  Reports:" << std::endl;
+            //for (auto& r : cluster_reports) {
+                //std::cout << "\t" << *r << std::endl;
+            //}
             Targets cluster_targets;
 
             // Find all targets
@@ -257,6 +282,10 @@ class SILMB {
             cluster_targets.erase(std::unique(cluster_targets.begin(),
                                               cluster_targets.end()),
                                   cluster_targets.end());
+            //std::cout << "  Targets:" << std::endl;
+            //for (auto& t : cluster_targets) {
+                //std::cout << "\t" << *t << std::endl;
+            //}
 
             // All targets except those in a cluster should later
             // be placed in individual clusters
@@ -267,56 +296,81 @@ class SILMB {
             all_targets.swap(c);
             c.clear();
 
+            auto cluster_obj = clusters.emplace_back(cluster_id,
+                                                     cluster_reports,
+                                                     cluster_targets);
             // Cluster id's for post-processing
-            for (auto t : cluster_targets) {
-                t->cluster = cluster_id;
+            for (auto t = std::begin(cluster_targets); t != std::end(cluster_targets); ++t) {  // NOLINT
+                (*t)->cluster_id = cluster_id;
             }
 
-            // Add cluster to return list
-            clusters.emplace_back(cluster_reports, cluster_targets);
             ++cluster_id;
+            //std::cout << "Cluster id: " << cluster_id << std::endl;
         }
 
         // All targets not in a cluster should be placed in individual clusters
-        for (auto t : all_targets) {
-            t->cluster = cluster_id;
-            clusters.emplace_back(Reports(), Targets({t}));
+        for (auto t = std::begin(all_targets); t != std::end(all_targets); ++t) {  // NOLINT
+            clusters.emplace_back(cluster_id, Reports(), Targets({*t}));
+            (*t)->cluster_id = cluster_id;
             ++cluster_id;
         }
     }
 
-    template<typename Report, typename Sensor>
-    void birth(const std::vector<Report>& reports, Sensor& sensor, double time) { // NOLINT
+    template<typename Sensor, typename Clusters>
+    void birth(const Clusters& clusters, const typename Sensor::Scan& scan, Sensor& sensor, double time) { // NOLINT
+        using Report = typename Sensor::Report;
         double rBsum = std::accumulate(
-            std::begin(reports),
-            std::end(reports),
+            std::begin(scan),
+            std::end(scan),
             0.0,
             [](double s, const Report& r) { return s + r.rB; });
 
         if (rBsum >= params.r_lim) {
             PARFOR
-            for (auto r = std::begin(reports); r < std::end(reports); ++r) {
-                double nr = r->rB * sensor.lambdaB / rBsum;
-                if (nr >= params.r_lim) {
-                    targettree.new_target(std::min(nr, params.rB_max),
-                                          sensor.pdf(&params, *r),
-                                          time);
+            for (auto c = std::begin(clusters); c != std::end(clusters); ++c) {
+                PARFOR
+                for (auto r = std::begin(c->reports); r != std::end(c->reports); ++r) {                    // NOLINT
+                    double nr = (*r)->rB * sensor.lambdaB / rBsum;
+                    if (nr >= params.r_lim) {
+                        targettree.new_target(std::min(nr, params.rB_max),
+                                              sensor.pdf(&params, **r),
+                                              time);
+                    }
                 }
             }
         }
     }
 
-    template<typename Report, typename Sensor>
-    void cluster_correct(Cluster<Report>& c, const Sensor& sensor) {
+    template<typename Sensor, typename Cluster>
+    void cluster_correct(Cluster& c, const Sensor& sensor) {
         unsigned M = c.targets.size();
+        unsigned N = c.reports.size();
+
+        // Remove from tree while updating
+        targettree.lock();
+        for (unsigned i = 0; i < M; ++i) {
+            targettree.remove(c.targets[i]);
+        }
+        targettree.unlock();
+
+        // Transform to NED coordinates
+        //std::cout << "Pre-local: " << c << std::endl;
+        c.transform_to_local();
+        //std::cout << "Post-local: " << c << std::endl;
+
+        // No targets to match with? Must be potential new targets then
         if (M == 0) {
             for (auto& r : c.reports) {
                 r->rB = 1;
             }
+            // Move back to LL CF again
+            //std::cout << "Pre-global 0: " << c << std::endl;
+            c.transform_to_global();
+            //std::cout << "Post-global 0: " << c << std::endl;
             return;
         }
-        unsigned N = c.reports.size();
 
+        // Create cost matrix
         Eigen::MatrixXd C(M, N + 2 * M);
         C.setConstant(inf);
         for (unsigned i = 0; i < M; ++i) {
@@ -335,6 +389,7 @@ class SILMB {
         double w_sum = 0;
         Eigen::MatrixXd R(M, N + 1);
         R.setZero();
+        // Draw most relevant hypotheses using Murty's algorithm
         while (murty.draw(res, cost)) {
             w = std::exp(-cost);
             w_sum += w;
@@ -352,31 +407,38 @@ class SILMB {
             }
         }
 
+        // No valid hypotheses?! Quit this farce!
         if (n == 0) {
             for (auto& r : c.reports) {
                 r->rB = 1;
             }
+            // Move back to LL CF again
+            //std::cout << "Pre-global 1: " << c << std::endl;
+            c.transform_to_global();
+            //std::cout << "Post-global 1: " << c << std::endl;
             return;
         }
 
         R /= w_sum;
 
-        targettree.lock();
-        for (unsigned i = 0; i < M; ++i) {
-            targettree.remove(c.targets[i]);
-        }
-        targettree.unlock();
-
+        // Update each target according to the hypotheses' associations
         for (unsigned i = 0; i < M; ++i) {
             c.targets[i]->correct(R.row(i));
         }
 
+        // Move back to LL CF again
+        //std::cout << "Pre-global: " << c << std::endl;
+        c.transform_to_global();
+        //std::cout << "Post-global: " << c << std::endl;
+
+        // Replace the still valid targets into tree
         targettree.lock();
         for (unsigned i = 0; i < M; ++i) {
             targettree.replace(c.targets[i]);
         }
         targettree.unlock();
 
+        // Forward birth probabilities to birth algorithm
         auto rB = (1.0 - R.colwise().sum().array()).eval();
         for (unsigned j = 0; j < N; ++j) {
             c.reports[j]->rB = rB[j];

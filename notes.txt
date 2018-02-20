@@ -1,0 +1,25 @@
+# Considerations when choosing a global coordinate system for tracking
+ - It is desirable to store objects in a global coordinate frame
+ - In a detection sense, objects are located in an LLA frame.
+ - The LLA frame is nonlinear, with discontinuities
+ - The ECEF frame is linear
+ - The ECEF frame is not constrained to the earth surface
+ - A manual constraint in the ECEF frame is nonlinear
+ - Targets should be tracked in a local NED-system
+
+
+# Algorithm for LLA bboxes
+
+Store targets in LLA
+Load clusters from targettree                           // Done
+ - Consider overflow
+Cluster targets in LLA
+Determine cluster mass center in LLA
+Set cluster origin in LLA
+Transform all cluster targets to NED
+Filter in NED
+ - Transform reports to NED with cluster origin
+Transform each target NED bbox to LLA
+ - Overflow LL coords to nearest mean
+ - Zero A coord
+Store targets with LLA bbox

@@ -4,6 +4,7 @@
 #include <iostream>
 #include <vector>
 #include "bbox.hpp"
+#include "cf.hpp"
 #include "gaussian.hpp"
 
 namespace lmb {
@@ -23,15 +24,15 @@ struct alignas(16) TargetSummary_ : public Gaussian_<S> {
     double& r;
     unsigned id;
 
-    TargetSummary_(const State& m_, const Covariance P_,
+    TargetSummary_(const State& x_, const Covariance P_,
                    double w_, unsigned id_)
-    : Parent(m_, P_, w_), r(this->w), id(id_) {}
+    : Parent(x_, P_, w_), r(this->w), id(id_) {}
 
     void repr(std::ostream& os) const {
         os << "{\"type\":\"T\""
            << ",\"id\":" << id
            << ",\"w\":" << this->w
-           << ",\"m\":" << this->m.format(eigenformat)
+           << ",\"x\":" << this->x.format(eigenformat)
            << ",\"P\":" << this->P.format(eigenformat)
            << "}";
     }
@@ -49,14 +50,15 @@ struct Target_ {
     double r;
     PDF pdf;
     std::vector<PDF> pdfs;
-    unsigned cluster;
+    unsigned cluster_id;
+
     double t;
     Action last_action;
 
     Target_()
     : r(0),
       pdfs(0),
-      cluster(0),
+      cluster_id(0),
       t(0.0),
       last_action(ACTION_INIT)
     {}
@@ -65,16 +67,34 @@ struct Target_ {
     : r(r_),
       pdf(pdf_),
       pdfs(0),
-      cluster(0),
+      cluster_id(0),
       t(0.0),
       last_action(ACTION_INIT)
     {}
 
+    void transform_to_local(const cf::LL& origin) {
+        pdf.transform_to_local(origin);
+    }
+
+    cf::LL transform_to_local() {
+        auto origin = pos();
+        transform_to_local(origin);
+        return origin;
+    }
+
+    void transform_to_global() {
+        pdf.transform_to_global();
+    }
+
+    cf::LL pos() {
+        return pdf.pos();
+    }
+
     explicit Target_(const Self&) = delete;
     Self operator=(const Self&) = delete;
 
-    template<typename Report, typename Sensor, typename RES, typename MRES>
-    void match(const std::vector<Report*>& reports,
+    template<typename Sensor, typename RES, typename MRES>
+    void match(const std::vector<typename Sensor::Report*>& reports,
                const Sensor& sensor,
                RES&& res,
                MRES& mres) {
@@ -96,6 +116,10 @@ struct Target_ {
         for (unsigned j = 0; j < M; ++j) {
             res(0, j) = (points[j] - m).norm();
         }
+    }
+
+    AABBox llaabbox() {
+        return pdf.llaabbox();
     }
 
     template<typename W>
@@ -126,12 +150,12 @@ struct Target_ {
     }
 
     Gaussian summary() {
-        return TargetSummary(pdf.mean(), pdf.cov(), r);
+        return TargetSummary(pdf.mean(), pdf.cov(), r, id);
     }
 
     void repr(std::ostream& os) const {
         os << "{\"id\":" << id
-           << ",\"cid\":" << cluster
+           << ",\"cid\":" << cluster_id
            << ",\"la\":\"" << char(last_action) << "\""
            << ",\"t\":" << t
            << ",\"r\":" << r

@@ -2,7 +2,7 @@
 #include <murty.hpp>
 #include <chrono>
 
-using namespace lmb;
+using namespace lap;
 using Clock = std::chrono::high_resolution_clock;
 
 Eigen::MatrixXd MURTY_COST = (Eigen::MatrixXd(10, 10) <<

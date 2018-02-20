@@ -5,6 +5,7 @@
 #include "params.hpp"
 
 using namespace lmb;
+using GaussianReport = GaussianReport_<2>;
 
 TEST(GMTests, Correct) {
     using PDF = GM<4>;
@@ -19,8 +20,8 @@ TEST(GMTests, Correct) {
     EXPECT_NEAR(Pr(0, 0), 1.0, 1e-2);
     EXPECT_EQ(pdf.c.size(), 1);
 
-    GaussianReport::Measurement m(2); m = Eigen::Vector2d({1, 1});
-    GaussianReport::Covariance P(2, 2); P = Eigen::Matrix2d::Identity();
+    GaussianReport::State m; m = Eigen::Vector2d({1, 1});
+    GaussianReport::Covariance P; P = Eigen::Matrix2d::Identity();
     GaussianReport z(m, P, 1);
     PositionSensor<Target> s;
     pdf.correct(z, s);

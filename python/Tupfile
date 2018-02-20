@@ -2,3 +2,4 @@ include_rules
 !pycc = |> $(COMPILER) $(CFLAGS) $(APP_CFLAGS) $(PY_CFLAGS) %f -o %o $(LDFLAGS) $(APP_LDFLAGS) $(PY_LDFLAGS) |> %B.cpython-36m-x86_64-linux-gnu.so
 
 :foreach *.cpp |> !pycc |> {pyapps}
+:foreach *.png.py |> python -B %f |> %B

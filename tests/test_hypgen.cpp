@@ -3,7 +3,7 @@
 #include <murty.hpp>
 #include <limits>
 
-using namespace lmb;
+using namespace lap;
 
 Eigen::MatrixXd MURTY_COST = (Eigen::MatrixXd(10, 10) <<
               7, 51, 52, 87, 38, 60, 74, 66, 0, 20,
@@ -56,59 +56,119 @@ TEST(LAPTests, SmallSingle) {
 }
 
 TEST(LAPTests, SingleLAP_Asym) {
-    Assignment res(MURTY_COST_ASYM.rows());
-    Slack u(MURTY_COST_ASYM.rows());
-    Slack v(MURTY_COST_ASYM.cols());
-    lap::lap(MURTY_COST_ASYM, res, u, v);
+    auto C = MURTY_COST_ASYM;
+    Assignment res(C.rows());
+    Slack u(C.rows());
+    Slack v(C.cols());
+    lap::lap(C, res, u, v);
     ASSERT_EQ(res, (Assignment(5) << 8, 6, 2, 1, 0).finished());
 }
 
 TEST(LAPTests, SingleMurtyState) {
-    MurtyState s(MURTY_COST);
+    auto C = MURTY_COST;
+    MurtyState s(C);
     s.solve();
     s.v.setZero();
+    auto res = s.solution;
+    auto cost = s.cost;
+    double cumsum = 0;
+    for (int i = 0; i < res.size(); ++i) { cumsum += C(i, res[i]); }
+    ASSERT_DOUBLE_EQ(cumsum, cost);
     ASSERT_EQ(s.solution, (Assignment(10) << 8, 6, 2, 7, 5, 3, 9, 0, 4, 1).finished());
 }
 
 TEST(MurtyTests, MiniMurty) {
-    Murty m(Eigen::Matrix<double, 1, 1>(0));
+    auto C = Eigen::Matrix<double, 1, 1>(0);
+    Murty m(C);
     Assignment res;
     double cost;
     m.draw(res, cost);
+    double cumsum = 0;
+    for (int i = 0; i < res.size(); ++i) { cumsum += C(i, res[i]); }
+    ASSERT_DOUBLE_EQ(cumsum, cost);
     ASSERT_EQ(res, (Assignment(1) << 0).finished());
 }
 
 TEST(MurtyTests, HardSingle) {
-    Murty m(MURTY_HARD);
+    auto C = MURTY_HARD;
+    Murty m(C);
     Assignment res;
     double cost;
     m.draw(res, cost);
+    double cumsum = 0;
+    for (int i = 0; i < res.size(); ++i) { cumsum += C(i, res[i]); }
+    ASSERT_DOUBLE_EQ(cumsum, cost);
     ASSERT_EQ(res, (Assignment(4) << 6, 1, 8, 0).finished());
 }
 
-TEST(MurtyTests, SmallMurty) {
-    Eigen::MatrixXd C = (Eigen::MatrixXd(1, 3) << 2.14843, inf, 1.20397).finished();
+TEST(MurtyTests, Hard) {
+    auto C = MURTY_HARD;
     Murty m(C);
     Assignment res;
     double cost;
     unsigned n = 0;
-    while(m.draw(res, cost)) { ++n; }
+    while (m.draw(res, cost)) {
+        ++n;
+        double cumsum = 0;
+        for (int i = 0; i < res.size(); ++i) { cumsum += C(i, res[i]); }
+        ASSERT_DOUBLE_EQ(cumsum, cost);
+    }
+    ASSERT_EQ(n, 3333);
+}
+
+TEST(MurtyTests, SmallMurty) {
+    Eigen::MatrixXd C = (Eigen::MatrixXd(1, 3) << 2.14843, lap::inf + 2, 1.20397).finished();
+    Murty m(C);
+    Assignment res;
+    double cost;
+    unsigned n = 0;
+    while (m.draw(res, cost)) {
+        ++n;
+        double cumsum = 0;
+        for (int i = 0; i < res.size(); ++i) { cumsum += C(i, res[i]); }
+        ASSERT_DOUBLE_EQ(cumsum, cost);
+    }
     ASSERT_EQ(n, 2);
 }
 
 TEST(MurtyTests, SingleMurty) {
-    Murty m(MURTY_COST);
+    auto C = MURTY_COST;
+    Murty m(C);
     Assignment res;
     double cost;
     m.draw(res, cost);
+    double cumsum = 0;
+    for (int i = 0; i < res.size(); ++i) { cumsum += C(i, res[i]); }
+    ASSERT_DOUBLE_EQ(cumsum, cost);
     ASSERT_EQ(res, (Assignment(10) << 8, 6, 2, 7, 5, 3, 9, 0, 4, 1).finished());
 }
 
 TEST(MurtyTests, FullMurty) {
-    Murty m(MURTY_COST.block<6, 6>(0, 0));
+    auto C = MURTY_COST.block<6, 6>(0, 0);
+    Murty m(C);
     Assignment res;
     double cost;
     unsigned n = 0;
-    while(m.draw(res, cost)) { ++n; }
+    while (m.draw(res, cost)) {
+        ++n;
+        double cumsum = 0;
+        for (int i = 0; i < res.size(); ++i) { cumsum += C(i, res[i]); }
+        ASSERT_DOUBLE_EQ(cumsum, cost);
+    }
     ASSERT_EQ(n, 720);
+}
+
+TEST(MurtyTests, RectMurty) {
+    auto C = MURTY_COST.block<2, 10>(0, 0);
+    Murty m(C);
+    Assignment res;
+    double cost;
+    unsigned n = 0;
+    while (m.draw(res, cost)) {
+        ++n;
+        double cumsum = 0;
+        for (int i = 0; i < res.size(); ++i) { cumsum += C(i, res[i]); }
+        ASSERT_DOUBLE_EQ(cumsum, cost);
+    }
+    ASSERT_EQ(n, 90);
 }

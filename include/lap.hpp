@@ -7,7 +7,7 @@ namespace lap {
 
 using Assignment = Eigen::Matrix<int, Eigen::Dynamic, 1>;
 using Slack = Eigen::Matrix<double, Eigen::Dynamic, 1>;
-int inf = 300000;
+static const int inf = 300000;
 
 template<typename CostMatrix, typename Assignment, typename RowSlack, typename ColSlack>  // NOLINT
 void lap(const CostMatrix& C, Assignment& x, RowSlack& u, ColSlack& v) {

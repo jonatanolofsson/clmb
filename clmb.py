@@ -30,7 +30,7 @@ class GM:
         for c in t["c"]:
             self.c.append((
                 c["w"],
-                np.array(c["m"]),
+                np.array(c["x"]),
                 np.matrix(c["P"])
             ))
 

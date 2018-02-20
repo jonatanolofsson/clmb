@@ -28,6 +28,18 @@ struct GM {
     BBox bbox;
     AABBox aabbox;
     double eta;
+    cf::LL origin;
+
+    GM() {}
+    explicit GM(Params* params_) : params(params_) {}
+
+    GM(Params* params_, const State& mean, const Covariance& cov)
+    : params(params_),
+      c({Gaussian(mean, cov)}) {
+        // Create bbox in local coordinates and transform to global..
+        transform_to_local(pos());
+        transform_to_global();
+    }
 
     void normalize() {
         double a = 0;
@@ -40,27 +52,22 @@ struct GM {
         } else {
             clear();
         }
-        update_bbox();
     }
 
-    void update_bbox() {
+    void update_local_bbox() {
         if (c.size() == 0) {
             return;
         }
 
-        bbox = BBox(mean().template topLeftCorner<2, 1>(),
-                    cov().template topLeftCorner<2, 2>(),
-                    params->nstd);
+        bbox = BBox(pos(), poscov(), params->nstd);
 
-        aabbox.min[0] = c[0].m(0);
-        aabbox.min[1] = c[0].m(1);
-        aabbox.max[0] = c[0].m(0);
-        aabbox.max[1] = c[0].m(1);
+        aabbox.min[0] = c[0].x[0];
+        aabbox.min[1] = c[0].x[1];
+        aabbox.max[0] = c[0].x[0];
+        aabbox.max[1] = c[0].x[1];
 
         for (unsigned i = 0; i < c.size(); ++i) {
-            AABBox cbox(c[i].m.template topLeftCorner<2, 1>(),
-                        c[i].P.template topLeftCorner<2, 2>(),
-                        params->nstd);
+            AABBox cbox = c[i].aabbox(params->nstd);
 
             aabbox.min[0] = std::min(aabbox.min[0], cbox.min[0]);
             aabbox.min[1] = std::min(aabbox.min[1], cbox.min[1]);
@@ -82,21 +89,11 @@ struct GM {
         eta = 0;
     }
 
-    GM() {}
-    GM(Params* params_) : params(params_) {}
-
-    GM(Params* params_, const State& mean, const Covariance& cov)
-    : params(params_),
-      c({Gaussian(mean, cov)})
-    {
-        update_bbox();
-    }
-
     template<typename Sensor>
     double correct(const typename Sensor::Report& z, const Sensor& s) {
         PARFOR
         for (unsigned i = 0; i < c.size(); ++i) {
-            c[i].correct(z, s);
+            c[i].correct(z, s, origin);
         }
         normalize();
         return eta;
@@ -105,7 +102,7 @@ struct GM {
     template<typename Sensor>
     double missed(const Sensor& s) {
         for (unsigned i = 0; i < c.size(); ++i) {
-            c[i].w *= s.pD(c[i]);
+            c[i].w *= s.pD(c[i], origin);
         }
         normalize();
         return 1 - eta;
@@ -115,7 +112,7 @@ struct GM {
     void linear_update(const FT& F, const QT& Q) {
         PARFOR
         for (unsigned i = 0; i < c.size(); ++i) {
-            c[i].m = F * c[i].m;
+            c[i].x = F * c[i].x;
             c[i].P = F * c[i].P * F.transpose() + Q;
         }
     }
@@ -176,7 +173,7 @@ struct GM {
             if (nw / wsum < pdf.params->cw_lim) {
                 break;
             }
-            pdf.c.emplace_back(pdfs[j].c[wi[j]].m, pdfs[j].c[wi[j]].P, nw);
+            pdf.c.emplace_back(pdfs[j].c[wi[j]].x, pdfs[j].c[wi[j]].P, nw);
             q.pop();
             if (++wi[j] < pdfs[j].c.size()) {
                 q.emplace(w(0, j) * pdfs[j].c[wi[j]].w, j);
@@ -189,16 +186,16 @@ struct GM {
         State res;
         res.setZero();
         for (auto& cmp : c) {
-            res += cmp.w * cmp.m;
+            res += cmp.w * cmp.x;
         }
         return res;
     }
 
-    Covariance cov(const State& m) const {
+    Covariance cov(const State& x) const {
         Covariance res;
         res.setZero();
         for (auto& cmp : c) {
-            auto d = cmp.m - m;
+            auto d = cmp.x - x;
             res += cmp.w * (cmp.P + d * d.transpose());
         }
         return res;
@@ -206,6 +203,35 @@ struct GM {
 
     Covariance cov() const {
         return cov(mean());
+    }
+
+    Eigen::Vector2d pos() {
+        return mean().template head<2>();
+    }
+
+    Eigen::Matrix2d poscov() const {
+        return cov().template topLeftCorner<2, 2>();
+    }
+
+    AABBox llaabbox() {
+        return aabbox;
+    }
+
+    void transform_to_local(const cf::LL& origin_) {
+        origin = origin_;
+        for (unsigned i = 0; i < c.size(); ++i) {
+            c[i].transform_to_local(origin);
+        }
+        // update_local_bbox();
+    }
+
+    void transform_to_global() {
+        update_local_bbox();
+        for (unsigned i = 0; i < c.size(); ++i) {
+            c[i].transform_to_global(origin);
+        }
+        bbox = bbox.llbbox(origin);
+        aabbox = aabbox.llaabbox(origin);
     }
 };
 

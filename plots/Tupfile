@@ -1,0 +1,2 @@
+include_rules
+: ../tests/crosstrack.output |> python -B plot_results.py %f --output %o |> %B.png

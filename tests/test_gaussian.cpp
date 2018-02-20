@@ -2,8 +2,10 @@
 #include <Eigen/Core>
 #include "gm.hpp"
 #include "target.hpp"
+#include "cf.hpp"
 
 using namespace lmb;
+using GaussianReport = GaussianReport_<2>;
 
 TEST(GaussianTests, Correct) {
     using PDF = Gaussian_<4>;
@@ -16,11 +18,12 @@ TEST(GaussianTests, Correct) {
     EXPECT_NEAR(Pr(0, 0), Pr(1, 1), 1e-2);
     EXPECT_NEAR(Pr(0, 0), 1.0, 1e-2);
 
-    GaussianReport::Measurement m(2); m = Eigen::Vector2d({1, 1});
-    GaussianReport::Covariance P(2, 2); P = Eigen::Matrix2d::Identity();
+    GaussianReport::State m; m = Eigen::Vector2d({1, 1});
+    GaussianReport::Covariance P; P = Eigen::Matrix2d::Identity();
     GaussianReport z(m, P, 1);
     PositionSensor<Target> s;
-    pdf.correct(z, s);
+    cf::LL origin; origin << 0, 0;
+    pdf.correct(z, s, origin);
     mr = pdf.mean();
     Pr = pdf.cov();
     EXPECT_NEAR(mr[0], 0.5, 1e-2);
