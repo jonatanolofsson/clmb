@@ -42,6 +42,7 @@ class SILMB {
     Params params;
 
     TargetTree targettree;
+    unsigned nof_clusters;
 
     SILMB() {}
 
@@ -99,7 +100,7 @@ class SILMB {
     //}
 
     template<typename Sensor>
-    void correct(typename Sensor::Scan& scan, const Sensor& sensor, double time) {  // NOLINT
+    void correct(const Sensor& sensor, typename Sensor::Scan& scan, double time) {  // NOLINT
         using Report = typename Sensor::Report;
         using Cluster = Cluster_<Report, Target>;
         using Clusters = typename std::vector<Cluster>;
@@ -152,7 +153,8 @@ class SILMB {
             res.emplace_back(t->pdf.mean(),
                              t->pdf.cov(),
                              t->r,
-                             t->id);
+                             t->id,
+                             t->cluster_id);
         }
         targettree.unlock();
         return res;
@@ -275,6 +277,7 @@ class SILMB {
                 cluster_targets.insert(cluster_targets.end(),
                                        matching_targets[r].begin(),
                                        matching_targets[r].end());
+                r->cluster_id = cluster_id;
             }
 
             // Make target list unique
@@ -314,6 +317,8 @@ class SILMB {
             (*t)->cluster_id = cluster_id;
             ++cluster_id;
         }
+
+        nof_clusters = cluster_id - 1;
     }
 
     template<typename Sensor, typename Clusters>

@@ -58,15 +58,17 @@ PYBIND11_MODULE(lmb, m) {
         .def_readwrite("P", &Tracker::Gaussian::P)
         .def("__repr__", &print<Tracker::Gaussian>);
     py::class_<TargetSummary>(m, "Target")
-        .def_readonly("m", &TargetSummary::x)
+        .def_readonly("x", &TargetSummary::x)
         .def_readonly("P", &TargetSummary::P)
         .def_readonly("r", &TargetSummary::w)
         .def_readonly("id", &TargetSummary::id)
+        .def_readonly("cid", &TargetSummary::cid)
         .def("__repr__", &print<TargetSummary>);
     py::class_<GaussianReport>(m, "GaussianReport")
         .def(py::init<GaussianReport::State,
                       GaussianReport::Covariance,
                       double>())
+        .def_readonly("cid", &GaussianReport::cluster_id)
         .def_readwrite("z", &GaussianReport::x)
         .def_readwrite("R", &GaussianReport::P)
         .def_readwrite("kappa", &GaussianReport::kappa)
@@ -87,5 +89,6 @@ PYBIND11_MODULE(lmb, m) {
         .def("nof_targets", &Tracker::nof_targets)
         .def("get_targets", &Tracker::get_targets)
         .def("ospa", &Tracker::ospa)
-        .def("gospa", &Tracker::gospa);
+        .def("gospa", &Tracker::gospa)
+        .def_readonly("nof_clusters", &Tracker::nof_clusters);
 }

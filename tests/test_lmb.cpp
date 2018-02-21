@@ -20,7 +20,7 @@ TEST(LMBTests, ConstructLMB) {
     GaussianReport z(m, P, 3);
     std::vector<GaussianReport> zs({z});
     PositionSensor<Filter::Target> s;
-    lmb.correct(zs, s, 1);
+    lmb.correct(s, zs, 1);
     ASSERT_EQ(lmb.targettree.targets.size(), 1);
     EXPECT_EQ(lmb.targettree.targets[0]->id, 0);
     EXPECT_DOUBLE_EQ(lmb.targettree.targets[0]->r, lmb.params.rB_max);
@@ -40,7 +40,7 @@ TEST(LMBTests, RunLMB) {
     for (double t = 0.0; t < 5; t += 1) {
         std::cout << "\n\nTime: " << t << std::endl;
         m = Eigen::Vector2d({t, t});
-        lmb.correct(zs, s, t);
+        lmb.correct(s, zs, t);
         std::cout << "Targets: " << lmb.targettree.targets.size() << std::endl;
         for (auto& t : lmb.targettree.targets) {
             std::cout << "\n\tTarget " << t->id << " (" << t << ")" << std::endl;
@@ -76,7 +76,7 @@ TEST(LMBTests, OSPA) {
     EXPECT_DOUBLE_EQ(lmb.ospa(truth6, c, p), c);
     EXPECT_DOUBLE_EQ(lmb.ospa(truth1, c, p), lmb.ospa(truth4, c, p));
 
-    lmb.correct(zs, s, 0);
+    lmb.correct(s, zs, 0);
 
     ASSERT_EQ(lmb.targettree.targets.size(), 1);
     EXPECT_DOUBLE_EQ(lmb.ospa(truth1, c, p), 0);
@@ -108,7 +108,7 @@ TEST(LMBTests, GOSPA) {
     EXPECT_DOUBLE_EQ(lmb.gospa(truth6, c, p), 2 * c);
     EXPECT_LT(lmb.gospa(truth1, c, p), lmb.gospa(truth4, c, p));
 
-    lmb.correct(zs, s, 0);
+    lmb.correct(s, zs, 0);
 
     ASSERT_EQ(lmb.targettree.targets.size(), 1);
     EXPECT_DOUBLE_EQ(lmb.gospa(truth1, c, p), 0);

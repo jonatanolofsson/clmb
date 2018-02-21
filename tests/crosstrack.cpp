@@ -32,7 +32,7 @@ int main() {
         });
         for (auto& r : zs) { r.transform_to_global(origin); }
         lmb.predict<CV<Tracker::Target>>(model, t);
-        lmb.correct(zs, s, t);
+        lmb.correct(s, zs, t);
         for (auto& t : lmb.targettree.targets) { t->transform_to_local(origin); }
         std::cout << "{\"t\":" << t
                   << ",\"scan\":" << zs

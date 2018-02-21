@@ -8,6 +8,7 @@ import logging
 import os
 import sys
 import lmb
+import cf
 import matplotlib.pyplot as plt
 import numpy as np
 import plot
@@ -44,7 +45,7 @@ class Application:
     async def correct(self, sensor, scan=None):
         """Step the model forward in time."""
         scan = scan or []
-        await self._get(self.tracker.correct, sensor, scan)
+        await self._get(self.tracker.correct, sensor, scan, self.time)
 
     async def get_targets(self):
         """Step the model forward in time."""
@@ -61,7 +62,7 @@ class Application:
     async def run(self):
         """Run application."""
         _LOGGER.debug("Starting application.")
-        plt.figure(figsize=(10, 10))
+        plt.figure(figsize=(30, 30))
         model = lmb.CV(0.9, 1.5)
         sensor = lmb.PositionSensor()
         sensor.lambdaB = 2
@@ -73,8 +74,11 @@ class Application:
         ntargets_true = []
         ntargets_verified = []
         ntargets = []
-        plt.subplot(2, 1, 1)
+        plt.subplot(3, 1, 1)
         history = []
+        origin = np.array([58.3887657, 15.6965082])
+        pre_enof_targets = 0
+        ospa, gospa = [], []
         for k in range(30):
             # print()
             print("k:", k)
@@ -85,8 +89,8 @@ class Application:
                 # print("Predicted: ", tracker_targets)
                 for target in targets:
                     target[0:2] += target[2:]
-            if k == 5:
-                targets.append(np.array([5.0, 5.0, 1.0, 0.0]))
+            # if k == 5:
+                # targets.append(np.array([5.0, 5.0, 1.0, 0.0]))
             if k % 7 == 0:
                 targets.append(np.random.multivariate_normal(
                     np.array([k, 7.0, 0.0, 0.0]),
@@ -94,37 +98,46 @@ class Application:
             if k % 9 == 1:
                 del targets[-1]
             if k == 10:
-                targets.append(np.array([10.0, -30.0, 1.0, -0.5]))
-            if k == 20:
-                targets.append(np.array([k, 0.0, 1.0, 4.0]))
+                targets.append(np.array([k, -30.0, 1.0, -0.5]))
+            # if k == 20:
+                # targets.append(np.array([k, 0.0, 1.0, 4.0]))
 
             reports = [lmb.GaussianReport(
                 # np.random.multivariate_normal(t[0:2], np.diag([0.01] * 2)),  # noqa
-                t[0:2, np.newaxis],
-                np.eye(2) * 0.5, 0.01)
+                cf.ne2ll(t[0:2, np.newaxis], origin),
+                np.eye(2) * 0.1, 0.01)
                        for i, t in enumerate(targets)]
-            sensor.lambdaB = 0.1 * len(reports)
+            sensor.lambdaB = max(0.2 * (len(reports) - pre_enof_targets), 0.01 * len(reports))
             await self.correct(sensor, reports)
             tracker_targets = await self.get_targets()
             history.append((k, tracker_targets))
-            ntargets.append(await self.enof_targets())
-            ntargets_verified.append(await self.nof_targets(0.9))
+            pre_enof_targets = await self.enof_targets()
+            ntargets.append(pre_enof_targets)
+            ntargets_verified.append(await self.nof_targets(0.7))
             ntargets_true.append(len(targets))
-            plot.plot_scan(reports)
+            ll_targets = [np.concatenate((cf.ne2ll(t[0:2], origin), t[2:])) for t in targets]
+            ospa.append(self.tracker.ospa(ll_targets, 1, 2))
+            gospa.append(self.tracker.gospa(ll_targets, 1, 1))
+            plot.plot_scan(reports, origin)
             plt.plot([t[0] for t in targets],
                      [t[1] for t in targets],
                      marker='D', color='y', alpha=.5, linestyle='None')
-        plot.plot_history(history, covellipse=True)
-        plt.axis([-1, k + 1, -k - 1, k + 1 + 10])
+            print("Nof clusters: ", self.tracker.nof_clusters)
+        plot.plot_history(history, origin, covellipse=False, min_r=0.7)
+        plt.xlim([-1, k + 3])
         plt.ylabel('Tracks')
-        plt.subplot(2, 1, 2)
+        plt.subplot(3, 1, 2)
         plt.plot(ntargets, label='Estimate')
         plt.plot(ntargets_true, label='True')
-        plt.plot(ntargets_verified, label='Verified')
+        plt.plot(ntargets_verified, label='Verified', marker='*')
         plt.ylabel('# Targets')
         plt.legend(fancybox=True, framealpha=0.5, loc=4, prop={'size': 10})
-        plot.plt.axis([-1, k + 1, min(ntargets + ntargets_true) - 0.1,
-                      max(ntargets + ntargets_true) + 0.1])
+        plt.xlim([-1, k + 3])
+        plt.subplot(3, 1, 3)
+        plt.plot(ospa, label="OSPA")
+        plt.plot(gospa, label="GOSPA")
+        plt.legend()
+        plt.xlim([-1, k + 3])
 
 
 def parse_args(*argv):

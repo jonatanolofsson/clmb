@@ -23,10 +23,11 @@ struct alignas(16) TargetSummary_ : public Gaussian_<S> {
     using Covariance = typename Parent::Covariance;
     double& r;
     unsigned id;
+    unsigned cid;
 
     TargetSummary_(const State& x_, const Covariance P_,
-                   double w_, unsigned id_)
-    : Parent(x_, P_, w_), r(this->w), id(id_) {}
+                   double w_, unsigned id_, unsigned cid_=0)
+    : Parent(x_, P_, w_), r(this->w), id(id_), cid(cid_) {}
 
     void repr(std::ostream& os) const {
         os << "{\"type\":\"T\""
@@ -150,7 +151,7 @@ struct Target_ {
     }
 
     Gaussian summary() {
-        return TargetSummary(pdf.mean(), pdf.cov(), r, id);
+        return TargetSummary(pdf.mean(), pdf.cov(), r, id, cluster_id);
     }
 
     void repr(std::ostream& os) const {
