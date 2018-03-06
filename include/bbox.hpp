@@ -3,6 +3,7 @@
 #include <Eigen/Core>
 #include <Eigen/Eigenvalues>
 #include <algorithm>
+#include <vector>
 #include <cmath>
 #include "cf.hpp"
 #include "constants.hpp"
@@ -22,6 +23,15 @@ struct AABBox {
         memcpy(max, obj.max, sizeof(max));
     }
 
+    explicit AABBox(const Eigen::Matrix<double, 2, Eigen::Dynamic>& points) {
+        auto pmin = points.rowwise().minCoeff();
+        min[0] = pmin[0];
+        min[1] = pmin[1];
+        auto pmax = points.rowwise().maxCoeff();
+        max[0] = pmax[0];
+        max[1] = pmax[1];
+    }
+
     void operator=(const AABBox& obj) {
         memcpy(min, obj.min, sizeof(min));
         memcpy(max, obj.max, sizeof(max));
@@ -37,8 +47,7 @@ struct AABBox {
         from_gaussian(x, P, nstd);
     }
 
-    template<typename T2>
-    explicit AABBox(const T2& P, double nstd = 2.0) {
+    explicit AABBox(const Eigen::Matrix2d& P, double nstd = 2.0) {
         from_gaussian(Eigen::Vector2d::Zero(), P, nstd);
     }
 

@@ -37,15 +37,15 @@ class Application:
         result = [task.result() for task in completed][0]
         return result
 
-    async def predict(self, model, time=None):
+    async def predict(self, model, time=None, last_time=None):
         """Step the model forward in time."""
+        last_time = last_time or self.time
         self.time = time or self.time + 1.0
-        await self._get(self.tracker.predict, model, self.time)
+        await self._get(self.tracker.predict, model, self.time, last_time)
 
-    async def correct(self, sensor, scan=None):
+    async def correct(self, sensor, scan, time):
         """Step the model forward in time."""
-        scan = scan or []
-        await self._get(self.tracker.correct, sensor, scan, self.time)
+        await self._get(self.tracker.correct, sensor, scan, time)
 
     async def get_targets(self):
         """Step the model forward in time."""
@@ -79,12 +79,13 @@ class Application:
         origin = np.array([58.3887657, 15.6965082])
         pre_enof_targets = 0
         ospa, gospa = [], []
+        last_time = 0
         for k in range(30):
             # print()
             print("k:", k)
             if k > 0:
                 sensor.lambdaB = 0.2
-                await self.predict(model, k)
+                await self.predict(model, k, last_time)
                 tracker_targets = await self.get_targets()
                 # print("Predicted: ", tracker_targets)
                 for target in targets:
@@ -108,7 +109,7 @@ class Application:
                 np.eye(2) * 0.1, 0.01)
                        for i, t in enumerate(targets)]
             sensor.lambdaB = max(0.2 * (len(reports) - pre_enof_targets), 0.01 * len(reports))
-            await self.correct(sensor, reports)
+            await self.correct(sensor, reports, k)
             tracker_targets = await self.get_targets()
             history.append((k, tracker_targets))
             pre_enof_targets = await self.enof_targets()

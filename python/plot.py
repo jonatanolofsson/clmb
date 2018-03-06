@@ -18,7 +18,7 @@
 import matplotlib.colors
 from numpy.random import RandomState
 import matplotlib.pyplot as plt
-from matplotlib.patches import Ellipse, Rectangle
+from matplotlib.patches import Ellipse, Polygon
 import numpy as np
 import cf
 
@@ -46,19 +46,21 @@ def plot_history(history, origin, c=0, covellipse=True, min_r=0, max_back=None, 
     """Plot single trace."""
     max_back = max_back or 0
     lines = {}
-    for t, summaries in history[-max_back:]:
-        for s in summaries:
-            if s.id not in lines:
-                lines[s.id] = [[], [], [], []]
-            lines[s.id][0].append(s.r)
-            lines[s.id][1].append(np.concatenate((cf.ll2ne(s.x[0:2], origin), s.x[2:])))
-            lines[s.id][2].append(s.P)
-            lines[s.id][3].append(s.cid)
-    for s in summaries:
-        if s.r < min_r:
-            del lines[s.id]
+    for recall in history[-max_back:]:
+        for t in recall["targets"]:
+            if t.id not in lines:
+                lines[t.id] = [[], [], [], []]
+            lines[t.id][0].append(t.r)
+            lines[t.id][1].append(np.concatenate((cf.ll2ne(t.x[0:2], origin), t.x[2:])))
+            lines[t.id][2].append(t.P)
+            lines[t.id][3].append(t.cid)
+        plot_bbox(recall["fov"].nebbox(origin).corners)
+    for t in recall["targets"]:
+        if t.r < min_r:
+            del lines[t.id]
     for id_, (rs, xs, Ps, cids) in lines.items():
         cl = c + id_
+        print("Line: ", id_, " :: ", xs)
         if trace:
             plt.plot([x[0] for x in xs], [x[1] for x in xs], color=CMAP(cl), **kwargs)
             for cid, x in zip(cids, xs):
@@ -103,25 +105,21 @@ def plot_scan(reports, origin, covellipse=True, **kwargs):
         'linestyle': 'None'
     }
     options.update(kwargs)
-    zs = [cf.ll2ne(r.z[0:2], origin) for r in reports]
+    zs = [cf.ll2ne(r.x[0:2], origin) for r in reports]
     plt.plot([float(z[0]) for z in zs],
              [float(z[1]) for z in zs], **options)
     if covellipse:
         for r in reports:
-            ca = plot_cov_ellipse(r.R[0:2, 0:2], cf.ll2ne(r.z[0:2], origin))
+            ca = plot_cov_ellipse(r.R[0:2, 0:2], cf.ll2ne(r.x[0:2], origin))
             ca.set_alpha(0.1)
             ca.set_facecolor(options['color'])
 
 
-def plot_bbox(obj, cseed=0, **kwargs):
+def plot_bbox(corners, id_=0, cseed=0, **kwargs):
     """Plot bounding box."""
-    id_ = getattr(obj, 'id', 0)
     options = {
         'alpha': 0.3,
         'color': CMAP(id_ + cseed)
     }
     options.update(kwargs)
-    bbox = obj.bbox()
-    plt.gca().add_patch(Rectangle(
-        (bbox[0], bbox[2]), bbox[1] - bbox[0], bbox[3] - bbox[2],
-        **options))
+    plt.gca().add_patch(Polygon(corners.T, **options))

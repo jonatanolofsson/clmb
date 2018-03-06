@@ -27,7 +27,12 @@ struct PositionSensor {
 
     PositionSensor()
     : pv(Eigen::Matrix2d::Identity() * 10)
-    {}
+    {
+        fov.corners << 90, 90, -90, -90,
+                       180, 0,  0,  180;
+        //fov.corners << 90, 90, -90, -90,
+                       //360, 0,  0,  360;
+    }
 
     template<typename States>
     auto measurement(const States& m) const {
@@ -54,7 +59,7 @@ struct PositionSensor {
     }
 
     template<typename Report>
-    typename Target::PDF pdf(Params* params, const Report& r) const {
+    typename Target::PDF pdf(Params* params, const Report& r, const double = 0) const {
         // FIXME: Better initial covariance (Rasmussen, Williams?)
         typename Target::PDF::State x;
         typename Target::PDF::Covariance P;

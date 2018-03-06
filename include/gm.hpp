@@ -91,20 +91,24 @@ struct GM {
 
     template<typename Sensor>
     double correct(const typename Sensor::Report& z, const Sensor& s) {
+        //std::cout << "Correcting: " << z << std::endl;
+        //std::cout << "Pre-correct: " << *this << std::endl;
         PARFOR
         for (unsigned i = 0; i < c.size(); ++i) {
             c[i].correct(z, s, origin);
         }
+        //std::cout << "Post-correct: " << *this << " : " << eta << std::endl;
         normalize();
+        //std::cout << "Post-norm: " << *this << " : " << eta << std::endl;
         return eta;
     }
 
     template<typename Sensor>
     double missed(const Sensor& s) {
+        eta = 0;
         for (unsigned i = 0; i < c.size(); ++i) {
-            c[i].w *= s.pD(c[i], origin);
+            eta += c[i].w * s.pD(c[i], origin);
         }
-        normalize();
         return 1 - eta;
     }
 
@@ -128,6 +132,7 @@ struct GM {
     Self operator+=(const Self& rhs) {
         c.reserve(c.size() + rhs.c.size());
         c.insert(c.end(), rhs.c.begin(), rhs.c.end());
+        prune();
         return *this;
     }
 
@@ -161,7 +166,10 @@ struct GM {
         for (unsigned j = 0; j < w.cols(); ++j) {
             wi[j] = 0;
             std::sort(std::rbegin(pdfs[j].c), std::rend(pdfs[j].c));
-            q.emplace(w(0, j) * pdfs[j].c[0].w, j);
+            //std::cout << "Join: " << w(0, j) << " : " << pdfs[j] << " : " << pdfs[j].c.size() << std::endl;
+            if (pdfs[j].c.size() > 0) {
+                q.emplace(w(0, j) * pdfs[j].c[0].w, j);
+            }
         }
 
         double wsum = 0;
@@ -180,6 +188,13 @@ struct GM {
             }
         }
         pdf.normalize();
+    }
+
+    template<typename POINTS, typename RES>
+    void sampled_pos_pdf(const POINTS& points, RES& res, const double scale = 1) const {
+        for (auto& cmp : c) {
+            cmp.sampled_pos_pdf(points, res, scale * cmp.w);
+        }
     }
 
     State mean() const {

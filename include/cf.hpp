@@ -269,7 +269,7 @@ template<typename NE, typename LL_ORIGIN>
 ECEF ne2ecef(const NE& ne, const LL_ORIGIN& origin) {
     LLA lla_origin; lla_origin << origin, 0;
     auto ecef0 = ll2ecef(origin);
-    NED ned; ned << ne, 0;
+    NED ned; ned << ne.template head<2>(), 0;
     // Make sure altitude is zero again
     return ll2ecef(ecef2ll(ecef0 + nedrot(lla_origin).transpose() * ned));
 }
@@ -288,12 +288,13 @@ LL ne2ll(const NE& ne, const LL_ORIGIN& origin) {
 
 template<typename NE, typename LL_ORIGIN>
 void ne2ll_i(NE&& ne, const LL_ORIGIN& origin) {
-    ne = cf::ne2ll(ne, origin).template head<2>();
+    ne.template head<2>() = cf::ne2ll(ne, origin)
+        .template head<2>();
 }
 
 template<typename LL, typename LL_ORIGIN>
 void ll2ne_i(LL&& ll, const LL_ORIGIN& origin) {
-    ll = cf::ll2ne(ll, origin);
+    ll.template head<2>() = cf::ll2ne(ll, origin);
 }
 
 }  // namespace cf

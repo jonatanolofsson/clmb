@@ -24,6 +24,7 @@ TEST(PFTests, Correct) {
     GaussianReport::Covariance P; P = Eigen::Matrix2d::Identity();
     GaussianReport z(m, P, 1);
     PositionSensor<Target> s;
+    s.fov = BBox();
     pdf.correct(z, s);
     mr = pdf.mean();
     Pr = pdf.cov();

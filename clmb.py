@@ -68,7 +68,6 @@ class Target:
 
     def add_state(self, t):
         """Add state."""
-        self.t = t["t"]
         self.cid = t["cid"]
         self.r = t["r"]
         types = {"GM": GM, "PF": PF}

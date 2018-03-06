@@ -33,6 +33,7 @@ PYBIND11_MODULE(lmb, m) {
     using PosSensor = PositionSensor<Tracker::Target>;
     py::class_<PosSensor>(m, "PositionSensor")
         .def(py::init())
+        .def_readwrite("fov", &PosSensor::fov)
         .def_readwrite("lambdaB", &PosSensor::lambdaB)
         .def_readwrite("pD", &PosSensor::pD_);
     py::class_<NM<Tracker::Target>>(m, "NM")
@@ -47,7 +48,15 @@ PYBIND11_MODULE(lmb, m) {
         .def_readwrite("q", &CV<Tracker::Target>::q);
     py::class_<BBox>(m, "BBox")
         .def(py::init())
+        .def(py::init<BBox::Corners>())
         .def_readwrite("corners", &BBox::corners)
+        .def("from_gaussian", &BBox::template from_gaussian<Eigen::Vector2d, Eigen::Matrix2d>)  // NOLINT
+        .def("nebbox", &BBox::nebbox)
+        .def("__repr__", &print<BBox>);
+    py::class_<AABBox>(m, "AABBox")
+        .def(py::init())
+        .def(py::init<double, double, double, double>())
+        //.def("from_gaussian", &BBox::template from_gaussian<Eigen::Vector2d, Eigen::Matrix2d>)  // NOLINT
         .def("__repr__", &print<BBox>);
     py::class_<Tracker::Gaussian>(m, "Gaussian")
         .def(py::init<Tracker::Gaussian::State,
@@ -69,7 +78,7 @@ PYBIND11_MODULE(lmb, m) {
                       GaussianReport::Covariance,
                       double>())
         .def_readonly("cid", &GaussianReport::cluster_id)
-        .def_readwrite("z", &GaussianReport::x)
+        .def_readwrite("x", &GaussianReport::x)
         .def_readwrite("R", &GaussianReport::P)
         .def_readwrite("kappa", &GaussianReport::kappa)
         .def("__repr__", &print<GaussianReport>);
@@ -83,12 +92,13 @@ PYBIND11_MODULE(lmb, m) {
         .def(py::init())
         .def_readwrite("params", &Tracker::params)
         .def("correct", &Tracker::template correct<PosSensor>, py::call_guard<py::gil_scoped_release>())  // NOLINT
-        .def("predict", (void (Tracker::*)(NM<Tracker::Target>&, double)) &Tracker::predict<NM<Tracker::Target>>, py::call_guard<py::gil_scoped_release>())  // NOLINT
-        .def("predict", (void (Tracker::*)(CV<Tracker::Target>&, double)) &Tracker::predict<CV<Tracker::Target>>, py::call_guard<py::gil_scoped_release>())  // NOLINT
+        .def("predict", (void (Tracker::*)(NM<Tracker::Target>&, double, double)) &Tracker::predict<NM<Tracker::Target>>, py::call_guard<py::gil_scoped_release>())  // NOLINT
+        .def("predict", (void (Tracker::*)(CV<Tracker::Target>&, double, double)) &Tracker::predict<CV<Tracker::Target>>, py::call_guard<py::gil_scoped_release>())  // NOLINT
         .def("enof_targets", &Tracker::enof_targets)
         .def("nof_targets", &Tracker::nof_targets)
-        .def("get_targets", &Tracker::get_targets)
-        .def("ospa", &Tracker::ospa)
-        .def("gospa", &Tracker::gospa)
+        .def("get_targets", (typename Tracker::TargetSummaries (Tracker::*)())&Tracker::get_targets)
+        .def("get_targets", (typename Tracker::TargetSummaries (Tracker::*)(const AABBox&))&Tracker::get_targets)
+        .def("ospa", (double (Tracker::*)(const typename Tracker::TargetStates&, const double, const double))&Tracker::ospa)
+        .def("gospa", (double (Tracker::*)(const typename Tracker::TargetStates&, const double, const double))&Tracker::gospa)
         .def_readonly("nof_clusters", &Tracker::nof_clusters);
 }

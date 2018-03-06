@@ -53,14 +53,12 @@ struct Target_ {
     std::vector<PDF> pdfs;
     unsigned cluster_id;
 
-    double t;
     Action last_action;
 
     Target_()
     : r(0),
       pdfs(0),
       cluster_id(0),
-      t(0.0),
       last_action(ACTION_INIT)
     {}
 
@@ -69,7 +67,6 @@ struct Target_ {
       pdf(pdf_),
       pdfs(0),
       cluster_id(0),
-      t(0.0),
       last_action(ACTION_INIT)
     {}
 
@@ -100,12 +97,17 @@ struct Target_ {
                RES&& res,
                MRES& mres) {
         unsigned M = reports.size();
+        //std::cout << "Match against: " << pdf << std::endl;
         pdfs.clear();
         pdfs.resize(M + 1, pdf);
 
         for (unsigned j = 0; j < M; ++j) {
             res(0, j) = -std::log(r * pdfs[j].correct(*reports[j], sensor));
         }
+        //std::cout << "Candidate corrections: " << std::endl;
+        //for (unsigned j = 0; j < M + 1; ++j) {
+            //std::cout << "\t" << pdfs[j] << std::endl;
+        //}
         mres = -std::log(r * pdfs[M].missed(sensor));
     }
 
@@ -135,8 +137,9 @@ struct Target_ {
     }
 
     template<typename Model>
-    void predict(Model& model, double time) {
-        model(this, time);
+    void predict(Model& model, const double time, const double last_time) {
+        //std::cout << "dT: " << time - last_time << std::endl;
+        model(this, time, last_time);
         pdf.normalize();
         r *= pdf.eta;
         last_action = ACTION_PREDICT;
@@ -150,6 +153,11 @@ struct Target_ {
         }
     }
 
+    template<typename POINTS, typename RES>
+    void pos_phd(const POINTS& points, RES& res) const {
+        pdf.sampled_pos_pdf(points, res, r);
+    }
+
     Gaussian summary() {
         return TargetSummary(pdf.mean(), pdf.cov(), r, id, cluster_id);
     }
@@ -158,7 +166,6 @@ struct Target_ {
         os << "{\"id\":" << id
            << ",\"cid\":" << cluster_id
            << ",\"la\":\"" << char(last_action) << "\""
-           << ",\"t\":" << t
            << ",\"r\":" << r
            << ",\"pdf\":" << pdf << "}";
     }

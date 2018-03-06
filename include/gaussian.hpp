@@ -1,6 +1,7 @@
 // Copyright 2018 Jonatan Olofsson
 #pragma once
 #include <Eigen/Core>
+#include <vector>
 #include "bbox.hpp"
 #include "cf.hpp"
 #include "statistics.hpp"
@@ -17,6 +18,8 @@ struct alignas(16) Gaussian_ {
     State x;
     Covariance P;
     double w;
+
+    Gaussian_() {}
 
     Gaussian_(const State& x_, const Covariance& P_, double w_ = 1.0)
     : x(x_),
@@ -63,6 +66,22 @@ struct alignas(16) Gaussian_ {
     template<typename RES>
     void sample(RES& res) const {
         nrand(res, x, P);
+    }
+
+    template<typename POINTS, typename RES>
+    void sampled_pos_pdf(const POINTS& points, RES& res, const double scale = 1) const {
+        const double logSqrt2Pi = 0.5*std::log(2*M_PI);
+        typedef Eigen::LLT<Eigen::Matrix2d> Chol;
+        Chol chol(poscov());
+        if (chol.info() != Eigen::Success) {
+            throw "decomposition failed!";
+        }
+        const Chol::Traits::MatrixL& L = chol.matrixL();
+        auto diff = (points.colwise() - pos()).eval();
+        auto quadform = L.solve(diff).colwise().squaredNorm().array();
+        auto pdf = ((-0.5*quadform - points.rows()*logSqrt2Pi).exp()
+            / L.determinant()).eval();
+        res.array() += pdf * scale / pdf.sum();
     }
 
     double overlap(const BBox& bbox) const {

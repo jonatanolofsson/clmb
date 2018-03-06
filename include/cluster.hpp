@@ -26,6 +26,9 @@ struct Cluster_ {
       id(id_)
     {}
 
+    explicit Cluster_(const Targets& targets_)
+    : targets(targets_) {}
+
     cf::LL center_of_mass() {
         cf::LL s; s.setZero();
         for (auto r : reports) { s += r->pos(); }

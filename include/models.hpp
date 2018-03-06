@@ -10,8 +10,8 @@ namespace lmb {
         CV() {}
         CV(double pS_, double q_) : pS(pS_), q(q_) {}
 
-        void operator()(Target* const t, const double time) {
-            double dT = (time - t->t);
+        void operator()(Target* const t, const double time, const double last_time) {
+            double dT = (time - last_time);
             double dT2 = dT * dT / 2;
             double dT3 = dT * dT * dT / 3;
 
@@ -29,8 +29,8 @@ namespace lmb {
             Q *= q;
 
             t->pdf.linear_update(F, Q);
-            t->r *= pS;
-            t->t = time;
+            // NOTE: Power, since dT is varying
+            t->r *= std::pow(pS, dT / 3600);
         }
     };
 
@@ -42,12 +42,11 @@ namespace lmb {
         NM() { Q.setZero(); }
         NM(const double pS_, const Eigen::Matrix4d Q_) : pS(pS_), Q(Q_) {}
 
-        void operator()(Target* const t, const double time) {
+        void operator()(Target* const t, const double, const double) {
             Eigen::Matrix4d F;
             F.setIdentity();
             t->pdf.linear_update(F, Q);
             t->r *= pS;
-            t->t = time;
         }
     };
 }

@@ -16,8 +16,10 @@ struct alignas(16) GaussianReport_ : public Gaussian_<S> {
     using Covariance = typename Gaussian::Covariance;
 
     volatile double rB;
-    double kappa;
+    double kappa = 1;
     unsigned cluster_id;
+
+    GaussianReport_() {}
 
     GaussianReport_(const State x_, const Covariance P_, double kappa_)
     : Gaussian(x_, P_) {

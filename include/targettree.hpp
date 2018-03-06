@@ -5,6 +5,7 @@
 #include "omp.hpp"
 #include "RTree.h"
 #include "target.hpp"
+#include "cf.hpp"
 
 namespace lmb {
 template<typename Target, typename R>
@@ -57,11 +58,10 @@ struct TargetTree_ {
         }
     }
 
-    void new_target(double r, PDF&& p, double time) {
+    void new_target(double r, PDF&& p) {
         Target* t = new Target(r, std::forward<PDF>(p));
         targets.push_back(t);
         t->id = id_counter++;
-        t->t = time;
         auto llaabbox = t->llaabbox();
         //std::cout << "New target: " << *t << ": " << llaabbox << std::endl;
         tree.Insert(llaabbox.min, llaabbox.max, t);
@@ -85,6 +85,16 @@ struct TargetTree_ {
         Targets result;
         tree.Search(aabbox.min,
                     aabbox.max,
+                    rtree_callback<Target, Targets>,
+                    reinterpret_cast<void*>(&result));
+
+        // FIXME: Wrap-around
+        return result;
+    }
+
+    Targets query(const cf::LL& point) const {
+        Targets result;
+        tree.Search(point.data(), point.data(),
                     rtree_callback<Target, Targets>,
                     reinterpret_cast<void*>(&result));
 

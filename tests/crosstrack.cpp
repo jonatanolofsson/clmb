@@ -24,6 +24,7 @@ int main() {
     cf::LL origin; origin << 58.3887657, 15.6965082;
     s.fov.from_gaussian(origin, 20*Eigen::Matrix2d::Identity());
     s.lambdaB = 0.5;
+    double last_time = 0;
     for (double t = 0.0; t < 12; t += 1.0) {
         //std::cout << std::endl << ":::::::::::::::::::::::::::::::::" << std::endl << t << std::endl << ":::::::::::::::::::::::::::::::::" << std::endl;
         std::vector<GaussianReport> zs({
@@ -31,7 +32,8 @@ int main() {
             GaussianReport(Eigen::Vector2d({t, 10 - t}), P, kappa)
         });
         for (auto& r : zs) { r.transform_to_global(origin); }
-        lmb.predict<CV<Tracker::Target>>(model, t);
+        lmb.predict<CV<Tracker::Target>>(model, t, last_time);
+        last_time = t;
         lmb.correct(s, zs, t);
         for (auto& t : lmb.targettree.targets) { t->transform_to_local(origin); }
         std::cout << "{\"t\":" << t
