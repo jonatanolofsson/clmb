@@ -159,19 +159,42 @@ struct BBox {
                    x + r1 * e.col(0) - r2 * e.col(1);
     }
 
-    bool intersects(const BBox& bbox) const {
+    bool intersects(const BBox& other) const {
         for (int i = 0; i < corners.cols(); ++i) {
-            if (bbox.within(corners.col(i))) {
+            if (other.within(corners.col(i))) {
                 return true;
             }
         }
-        for (int i = 0; i < bbox.corners.cols(); ++i) {
-            if (within(bbox.corners.col(i))) {
+        for (int i = 0; i < other.corners.cols(); ++i) {
+            if (within(other.corners.col(i))) {
                 return true;
             }
         }
-        // FIXME: "SWISS CROSS" will fails!
-        return false;
+        if (corners == other.corners) {
+            return true;
+        }
+        // "SWISS CROSS"!
+        // Find a point that would be in the center of both boxes
+        // in this case - the intersection of the boxes' diagonals -
+        // and check if it's inside the box.
+        // Line-line intersection: https://en.wikipedia.org/wiki/Line%E2%80%93line_intersection
+        auto a0 = corners.col(0);  // (x1, y1)
+        auto a2 = corners.col(2);  // (x2, y2)
+        auto b0 = other.corners.col(0);  // (x3, y3)
+        auto b2 = other.corners.col(2);  // (x4, y4)
+        double x1 = a0.x(); double y1 = a0.y();
+        double x2 = a2.x(); double y2 = a2.y();
+        double x3 = b0.x(); double y3 = b0.y();
+        double x4 = b2.x(); double y4 = b2.y();
+        auto denom = ((x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4));
+        if (denom < 1e-9) {
+            return false;
+        }
+        auto centerpoint = Eigen::Vector2d(
+            (x1 * y2 - y1 * x2) * (x3 - x4) - (x1 - x2) * (x3 * y4 - y3 * x4),
+            (x1 * y2 - y1 * x2) * (y3 - y4) - (y1 - y2) * (x3 * y4 - y3 * x4))
+            / denom;
+        return within(centerpoint);
     }
 
     bool intersects(const AABBox& aabb) const {

@@ -52,6 +52,17 @@ TEST(BBoxTests, Intersect) {
     EXPECT_TRUE(bbox.intersects(bbox2));
 }
 
+TEST(BBoxTests, SwissCross) {
+    Corners corners; corners << 2, 6, 7, 3,
+                                6, 1, 4, 8;
+    Corners corners2; corners2 << 4.5, 7, 6, 3,
+                                    1, 7, 8, 3;
+
+    BBox bbox(corners);
+    BBox bbox2(corners2);
+    EXPECT_TRUE(bbox.intersects(bbox2));
+}
+
 TEST(BBoxTests, Disjoint) {
     Corners corners; corners << 0, 0, 1, 1,
                                 1, 0, 0, 1;
