@@ -1,5 +1,4 @@
 include_rules
-CFLAGS += -I$(TOP)/libs/rapidjson/include
 
 !appcc = |> $(COMPILER) $(CFLAGS) $(APP_CFLAGS) %f -o %o $(LDFLAGS) $(APP_LDFLAGS) |> %B
 
