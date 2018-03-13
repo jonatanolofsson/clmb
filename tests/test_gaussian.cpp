@@ -39,11 +39,11 @@ TEST(GaussianTests, Correct) {
 TEST(GaussianTests, pos_pdf) {
     using PDF = Gaussian_<4>;
     PDF pdf({0, 0, 0, 0}, PDF::Covariance::Identity(), 1.0);
-    Eigen::Matrix<double, 2, 2> points;
+    Eigen::Array<double, 2, Eigen::Dynamic> points(2, 2);
     points << 0, 1,
               0, 0;
 
-    Eigen::Matrix<double, 1, 2> res; res.setZero();
+    Eigen::Array<double, 1, Eigen::Dynamic> res(1, 2); res.setZero();
     pdf.sampled_pos_pdf(points, res);
     EXPECT_DOUBLE_EQ(res[0], 0.6224593312018545932);
     EXPECT_DOUBLE_EQ(res[1], 0.37754066879814546231);

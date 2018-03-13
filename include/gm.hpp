@@ -190,8 +190,9 @@ struct GM {
         pdf.normalize();
     }
 
-    template<typename POINTS, typename RES>
-    void sampled_pos_pdf(const POINTS& points, RES& res, const double scale = 1) const {
+    void sampled_pos_pdf(const Eigen::Array<double, 2, Eigen::Dynamic>& points,
+                         Eigen::Array<double, 1, Eigen::Dynamic>& res,
+                         const double scale = 1) const {
         for (auto& cmp : c) {
             cmp.sampled_pos_pdf(points, res, scale * cmp.w);
         }
@@ -238,6 +239,11 @@ struct GM {
             c[i].transform_to_local(origin);
         }
         // update_local_bbox();
+    }
+
+    cf::LL transform_to_local() {
+        transform_to_local(pos());
+        return origin;
     }
 
     void transform_to_global() {

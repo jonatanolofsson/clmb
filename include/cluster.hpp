@@ -38,37 +38,63 @@ struct Cluster_ {
     }
 
     void transform_to_local() {
-        //std::cout << "Transforming cluster " << id << " to local" << std::endl;
+#ifdef DEBUG_OUTPUT
+        std::cout << "Transforming cluster " << id << " to local" << std::endl;
+#endif
         origin = center_of_mass();
-        //std::cout << "  Origin: " << origin.format(eigenformat) << std::endl;
-        //std::cout << "Reports: " << std::endl;
+#ifdef DEBUG_OUTPUT
+        std::cout << "  Origin: " << origin.format(eigenformat) << std::endl;
+        std::cout << "Reports: " << std::endl;
+#endif
         for (auto& r : reports) {
-            //std::cout << "\t" << *r;
+#ifdef DEBUG_OUTPUT
+            std::cout << "\t" << *r;
+#endif
             r->transform_to_local(origin);
-            //std::cout << " -> " << *r << std::endl;
+#ifdef DEBUG_OUTPUT
+            std::cout << " -> " << *r << std::endl;
+#endif
         }
-        //std::cout << "Targets: " << std::endl;
+#ifdef DEBUG_OUTPUT
+        std::cout << "Targets: " << std::endl;
+#endif
         for (auto& t : targets) {
-            //std::cout << "\t" << *t;
+#ifdef DEBUG_OUTPUT
+            std::cout << "\t" << *t;
+#endif
             t->transform_to_local(origin);
-            //std::cout << " -> " << *t << std::endl;
+#ifdef DEBUG_OUTPUT
+            std::cout << " -> " << *t << std::endl;
+#endif
         }
     }
 
     void transform_to_global() {
-        //std::cout << "Transforming cluster " << id << " to global" << std::endl;
-        //std::cout << "  Origin: " << origin.format(eigenformat) << std::endl;
-        //std::cout << "Reports: " << std::endl;
+#ifdef DEBUG_OUTPUT
+        std::cout << "Transforming cluster " << id << " to global" << std::endl;
+        std::cout << "  Origin: " << origin.format(eigenformat) << std::endl;
+        std::cout << "Reports: " << std::endl;
+#endif
         for (auto& r : reports) {
-            //std::cout << "\t" << *r;
+#ifdef DEBUG_OUTPUT
+            std::cout << "\t" << *r;
+#endif
             r->transform_to_global(origin);
-            //std::cout << " -> " << *r << std::endl;
+#ifdef DEBUG_OUTPUT
+            std::cout << " -> " << *r << std::endl;
+#endif
         }
-        //std::cout << "Targets: " << std::endl;
+#ifdef DEBUG_OUTPUT
+        std::cout << "Targets: " << std::endl;
+#endif
         for (auto& t : targets) {
-            //std::cout << "\t" << *t;
+#ifdef DEBUG_OUTPUT
+            std::cout << "\t" << *t;
+#endif
             t->transform_to_global();
-            //std::cout << " -> " << *t << std::endl;
+#ifdef DEBUG_OUTPUT
+            std::cout << " -> " << *t << std::endl;
+#endif
         }
     }
 

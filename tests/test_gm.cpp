@@ -60,11 +60,11 @@ TEST(GMTests, pos_pdf) {
     PDF pdf1(&params, {0, 0}, PDF::Covariance::Identity());
     PDF pdf2(&params, {1, 0}, PDF::Covariance::Identity());
     pdf2 += pdf1;
-    Eigen::Matrix<double, 2, 2> points;
+    Eigen::Array<double, 2, Eigen::Dynamic> points(2, 2);
     points << 0, 1,
               0, 0;
 
-    Eigen::Matrix<double, 1, 2> res; res.setZero();
+    Eigen::Array<double, 1, Eigen::Dynamic> res(1, 2); res.setZero();
     pdf2.sampled_pos_pdf(points, res);
     EXPECT_DOUBLE_EQ(res[0], 0.5);
     EXPECT_DOUBLE_EQ(res[1], 0.5);

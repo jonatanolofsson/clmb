@@ -21,6 +21,8 @@
 #include "target.hpp"
 #include "targettree.hpp"
 
+//#define DEBUG_OUTPUT
+
 namespace lmb {
 
 using lap::Murty;
@@ -51,7 +53,9 @@ class SILMB {
 
     template<typename Model>
     void predict(Model& model, const double time, const double last_time) {
-        //std::cout << "\n\nPredict::::::::::" << std::endl;
+#ifdef DEBUG_OUTPUT
+        std::cout << "\n\nPredict::::::::::" << std::endl;
+#endif
         targettree.lock();
         for (auto& t : targettree.targets) {
             targettree.remove(t);
@@ -61,13 +65,21 @@ class SILMB {
         PARFOR
         for (auto t = std::begin(targettree.targets);
                 t < std::end(targettree.targets); ++t) {
-            //std::cout << "P: Pre-local: " << **t << std::endl;
+#ifdef DEBUG_OUTPUT
+            std::cout << "P: Pre-local: " << **t << std::endl;
+#endif
             (*t)->transform_to_local();
-            //std::cout << "P: Post-local: " << **t << std::endl;
+#ifdef DEBUG_OUTPUT
+            std::cout << "P: Post-local: " << **t << std::endl;
+#endif
             (*t)->template predict<Model>(model, time, last_time);
-            //std::cout << "P: Pre-global: " << **t << std::endl;
+#ifdef DEBUG_OUTPUT
+            std::cout << "P: Pre-global: " << **t << std::endl;
+#endif
             (*t)->transform_to_global();
-            //std::cout << "P: Post-global: " << **t << std::endl;
+#ifdef DEBUG_OUTPUT
+            std::cout << "P: Post-global: " << **t << std::endl;
+#endif
         }
 
         targettree.lock();
@@ -104,18 +116,22 @@ class SILMB {
         using Report = typename Sensor::Report;
         using Cluster = Cluster_<Report, Target>;
         using Clusters = typename std::vector<Cluster>;
-        //std::cout << "\n\nCorrect::::::::::" << std::endl;
+#ifdef DEBUG_OUTPUT
+        std::cout << "\n\nCorrect::::::::::" << std::endl;
 
-        //std::cout << "FOV: " << sensor.fov.aabbox() << std::endl;
+        std::cout << "FOV: " << sensor.fov.aabbox() << std::endl;
+#endif
         auto affected_targets = sensor.get_targets(targettree);
-        //std::cout << "Affected targets: " << affected_targets.size() << std::endl;
-        //for (auto& t : affected_targets) {
-            //std::cout << "\t" << *t << ": " << t->llaabbox() << std::endl;
-        //}
-        //std::cout << "All targets: " << std::endl;
-        //for (auto& t : targettree.targets) {
-            //std::cout << "\t" << *t << ": " << t->llaabbox() << std::endl;
-        //}
+#ifdef DEBUG_OUTPUT
+        std::cout << "Affected targets: " << affected_targets.size() << std::endl;
+        for (auto& t : affected_targets) {
+            std::cout << "\t" << *t << ": " << t->llaabbox() << std::endl;
+        }
+        std::cout << "All targets: " << std::endl;
+        for (auto& t : targettree.targets) {
+            std::cout << "\t" << *t << ": " << t->llaabbox() << std::endl;
+        }
+#endif
 
         Clusters clusters;
         cluster<Sensor>(scan, affected_targets, clusters);
@@ -177,10 +193,9 @@ class SILMB {
         return res;
     }
 
-    template<typename POINTS>
-    Eigen::Array<double, 1, Eigen::Dynamic> pos_phd(const POINTS& points) {
-        POINTS nepoints(2, points.size());
-        Eigen::Array<double, 1, Eigen::Dynamic> res(points.size());
+    Eigen::Array<double, 1, Eigen::Dynamic> pos_phd(const Eigen::Array<double, 2, Eigen::Dynamic>& points) {
+        Eigen::Array<double, 2, Eigen::Dynamic> nepoints(2, points.size());
+        Eigen::Array<double, 1, Eigen::Dynamic> res(1, points.size());
         res.setZero();
         if (points.size() == 0) {
             return res;
@@ -189,10 +204,15 @@ class SILMB {
         targettree.lock();
 
         // Load all affected targets
-        Targets targets = targettree.query(AABBox(points));
+        AABBox aabbox; aabbox.from_points(points);
+        Targets targets = targettree.query(aabbox);
+        if (targets.size() == 0) {
+            targettree.unlock();
+            return res;
+        }
 
         // Transform to local coordinates
-        cf::LL origin;
+        cf::LL origin; origin.setZero();
         for (auto t : targets) { origin += t->pos(); }
         origin /= targets.size();
 
@@ -202,7 +222,7 @@ class SILMB {
             nepoints.col(i) = cf::ll2ne(points.col(i), origin);
         }
 
-        // for each point, sum sample target phds
+        // for all points, sum sample target phds
         for (auto t = targets.begin(); t != targets.end(); ++t) {
             (*t)->pos_phd(nepoints, res);
         }
@@ -315,11 +335,13 @@ class SILMB {
                  Clusters& clusters) {
         using Report = typename Sensor::Report;
         using Reports = std::vector<Report*>;
-        //std::cout << "Clustering reports: " << scan << std::endl;
-        //std::cout << "Clustering targets: " << std::endl;
-        //for (auto& t : all_targets) {
-            //std::cout << "\t" << t << ": " << *t << std::endl;
-        //}
+#ifdef DEBUG_OUTPUT
+        std::cout << "Clustering reports: " << scan << std::endl;
+        std::cout << "Clustering targets: " << std::endl;
+        for (auto& t : all_targets) {
+            std::cout << "\t" << t << ": " << *t << std::endl;
+        }
+#endif
         // Clustering is performed in the LL CF
         Targets c;
         clusters.clear();
@@ -332,7 +354,9 @@ class SILMB {
             matching_targets[&(*r)] = targettree.query(r->llaabbox());
             for (auto t = std::begin(matching_targets[&(*r)]); t != std::end(matching_targets[&(*r)]); ++t) {  // NOLINT
                 matching_reports[*t].push_back(&(*r));
-                //std::cout << "Report matched target: " << *r << " <-> " << **t << std::endl;
+#ifdef DEBUG_OUTPUT
+                std::cout << "Report matched target: " << *r << " <-> " << **t << std::endl;
+#endif
             }
         }
 
@@ -341,18 +365,22 @@ class SILMB {
             cc.init(&(*r));
             for (auto t = std::begin(matching_targets[&(*r)]); t != std::end(matching_targets[&(*r)]); ++t) {  // NOLINT
                 cc.connect(&(*r), matching_reports[*t]);
-                //std::cout << "Connecting: " << *r << " <-> " << **t << std::endl;
+#ifdef DEBUG_OUTPUT
+                std::cout << "Connecting: " << *r << " <-> " << **t << std::endl;
+#endif
             }
         }
 
         Reports cluster_reports;
         unsigned cluster_id = 1;
         while (cc.get_component(cluster_reports)) {
-            //std::cout << "Cluster: " << std::endl;
-            //std::cout << "  Reports:" << std::endl;
-            //for (auto& r : cluster_reports) {
-                //std::cout << "\t" << *r << std::endl;
-            //}
+#ifdef DEBUG_OUTPUT
+            std::cout << "Cluster: " << std::endl;
+            std::cout << "  Reports:" << std::endl;
+            for (auto& r : cluster_reports) {
+                std::cout << "\t" << *r << std::endl;
+            }
+#endif
             Targets cluster_targets;
 
             // Find all targets
@@ -368,10 +396,12 @@ class SILMB {
             cluster_targets.erase(std::unique(cluster_targets.begin(),
                                               cluster_targets.end()),
                                   cluster_targets.end());
-            //std::cout << "  Targets:" << std::endl;
-            //for (auto& t : cluster_targets) {
-                //std::cout << "\t" << *t << std::endl;
-            //}
+#ifdef DEBUG_OUTPUT
+            std::cout << "  Targets:" << std::endl;
+            for (auto& t : cluster_targets) {
+                std::cout << "\t" << *t << std::endl;
+            }
+#endif
 
             // All targets except those in a cluster should later
             // be placed in individual clusters
@@ -391,7 +421,9 @@ class SILMB {
             }
 
             ++cluster_id;
-            //std::cout << "Cluster id: " << cluster_id << std::endl;
+#ifdef DEBUG_OUTPUT
+            std::cout << "Cluster id: " << cluster_id << std::endl;
+#endif
         }
 
         // All targets not in a cluster should be placed in individual clusters
@@ -442,9 +474,13 @@ class SILMB {
         targettree.unlock();
 
         // Transform to NED coordinates
-        //std::cout << "Pre-local: " << c << std::endl;
+#ifdef DEBUG_OUTPUT
+        std::cout << "Pre-local: " << c << std::endl;
+#endif
         c.transform_to_local();
-        //std::cout << "Post-local: " << c << std::endl;
+#ifdef DEBUG_OUTPUT
+        std::cout << "Post-local: " << c << std::endl;
+#endif
 
         if (M > 0) {
             // There are targets to match with
@@ -459,7 +495,9 @@ class SILMB {
                 C(i, N + M + i) = c.targets[i]->false_target();
             }
 
-            //std::cout << "C: \n" << C << std::endl;
+#ifdef DEBUG_OUTPUT
+            std::cout << "C: \n" << C << std::endl;
+#endif
 
             Murty murty(C);
             Assignment res;
@@ -510,9 +548,13 @@ class SILMB {
         }
 
         // Move back to LL CF again
-        //std::cout << "Pre-global: " << c << std::endl;
+#ifdef DEBUG_OUTPUT
+        std::cout << "Pre-global: " << c << std::endl;
+#endif
         c.transform_to_global();
-        //std::cout << "Post-global: " << c << std::endl;
+#ifdef DEBUG_OUTPUT
+        std::cout << "Post-global: " << c << std::endl;
+#endif
 
         // Replace the still valid targets into tree
         targettree.lock();

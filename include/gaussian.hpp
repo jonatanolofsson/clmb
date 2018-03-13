@@ -68,8 +68,9 @@ struct alignas(16) Gaussian_ {
         nrand(res, x, P);
     }
 
-    template<typename POINTS, typename RES>
-    void sampled_pos_pdf(const POINTS& points, RES& res, const double scale = 1) const {
+    void sampled_pos_pdf(const Eigen::Array<double, 2, Eigen::Dynamic>& points,
+                         Eigen::Array<double, 1, Eigen::Dynamic>& res,
+                         const double scale = 1) const {
         const double logSqrt2Pi = 0.5*std::log(2*M_PI);
         typedef Eigen::LLT<Eigen::Matrix2d> Chol;
         Chol chol(poscov());
@@ -77,7 +78,7 @@ struct alignas(16) Gaussian_ {
             throw "decomposition failed!";
         }
         const Chol::Traits::MatrixL& L = chol.matrixL();
-        auto diff = (points.colwise() - pos()).eval();
+        auto diff = (points.matrix().colwise() - pos()).matrix().eval();
         auto quadform = L.solve(diff).colwise().squaredNorm().array();
         auto pdf = ((-0.5*quadform - points.rows()*logSqrt2Pi).exp()
             / L.determinant()).eval();

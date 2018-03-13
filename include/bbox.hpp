@@ -23,15 +23,6 @@ struct AABBox {
         memcpy(max, obj.max, sizeof(max));
     }
 
-    explicit AABBox(const Eigen::Matrix<double, 2, Eigen::Dynamic>& points) {
-        auto pmin = points.rowwise().minCoeff();
-        min[0] = pmin[0];
-        min[1] = pmin[1];
-        auto pmax = points.rowwise().maxCoeff();
-        max[0] = pmax[0];
-        max[1] = pmax[1];
-    }
-
     void operator=(const AABBox& obj) {
         memcpy(min, obj.min, sizeof(min));
         memcpy(max, obj.max, sizeof(max));
@@ -73,6 +64,15 @@ struct AABBox {
         min[1] = x[1] - dy;
         max[0] = x[0] + dx;
         max[1] = x[1] + dy;
+    }
+
+    void from_points(const Eigen::Matrix<double, 2, Eigen::Dynamic>& points) {
+        auto pmin = points.rowwise().minCoeff();
+        min[0] = pmin[0];
+        min[1] = pmin[1];
+        auto pmax = points.rowwise().maxCoeff();
+        max[0] = pmax[0];
+        max[1] = pmax[1];
     }
 
     bool intersects(const AABBox& b) const {

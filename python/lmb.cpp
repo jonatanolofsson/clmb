@@ -50,7 +50,9 @@ PYBIND11_MODULE(lmb, m) {
         .def(py::init())
         .def(py::init<BBox::Corners>())
         .def_readwrite("corners", &BBox::corners)
-        .def("from_gaussian", &BBox::template from_gaussian<Eigen::Vector2d, Eigen::Matrix2d>)  // NOLINT
+        .def("from_gaussian",
+             &BBox::template from_gaussian<Eigen::Vector2d, Eigen::Matrix2d>,
+             py::arg("mean"), py::arg("cov"), py::arg("nstd") = 2.0)
         .def("nebbox", &BBox::nebbox)
         .def("__repr__", &print<BBox>);
     py::class_<AABBox>(m, "AABBox")
@@ -98,6 +100,7 @@ PYBIND11_MODULE(lmb, m) {
         .def("nof_targets", &Tracker::nof_targets)
         .def("get_targets", (typename Tracker::TargetSummaries (Tracker::*)())&Tracker::get_targets)
         .def("get_targets", (typename Tracker::TargetSummaries (Tracker::*)(const AABBox&))&Tracker::get_targets)
+        .def("pos_phd", &Tracker::pos_phd)
         .def("ospa", (double (Tracker::*)(const typename Tracker::TargetStates&, const double, const double))&Tracker::ospa)
         .def("gospa", (double (Tracker::*)(const typename Tracker::TargetStates&, const double, const double))&Tracker::gospa)
         .def_readonly("nof_clusters", &Tracker::nof_clusters);

@@ -54,7 +54,8 @@ def plot_history(history, origin, c=0, covellipse=True, min_r=0, max_back=None, 
             lines[t.id][1].append(np.concatenate((cf.ll2ne(t.x[0:2], origin), t.x[2:])))
             lines[t.id][2].append(t.P)
             lines[t.id][3].append(t.cid)
-        plot_bbox(recall["fov"].nebbox(origin).corners)
+        if "fov" in recall:
+            plot_bbox(recall["fov"].nebbox(origin).corners)
     for t in recall["targets"]:
         if t.r < min_r:
             del lines[t.id]

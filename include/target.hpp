@@ -75,9 +75,7 @@ struct Target_ {
     }
 
     cf::LL transform_to_local() {
-        auto origin = pos();
-        transform_to_local(origin);
-        return origin;
+        return pdf.transform_to_local();
     }
 
     void transform_to_global() {
@@ -97,17 +95,21 @@ struct Target_ {
                RES&& res,
                MRES& mres) {
         unsigned M = reports.size();
-        //std::cout << "Match against: " << pdf << std::endl;
+#ifdef DEBUG_OUTPUT
+        std::cout << "Match against: " << pdf << std::endl;
+#endif
         pdfs.clear();
         pdfs.resize(M + 1, pdf);
 
         for (unsigned j = 0; j < M; ++j) {
             res(0, j) = -std::log(r * pdfs[j].correct(*reports[j], sensor));
         }
-        //std::cout << "Candidate corrections: " << std::endl;
-        //for (unsigned j = 0; j < M + 1; ++j) {
-            //std::cout << "\t" << pdfs[j] << std::endl;
-        //}
+#ifdef DEBUG_OUTPUT
+        std::cout << "Candidate corrections: " << std::endl;
+        for (unsigned j = 0; j < M + 1; ++j) {
+            std::cout << "\t" << pdfs[j] << std::endl;
+        }
+#endif
         mres = -std::log(r * pdfs[M].missed(sensor));
     }
 
@@ -138,7 +140,9 @@ struct Target_ {
 
     template<typename Model>
     void predict(Model& model, const double time, const double last_time) {
-        //std::cout << "dT: " << time - last_time << std::endl;
+#ifdef DEBUG_OUTPUT
+        std::cout << "dT: " << time - last_time << std::endl;
+#endif
         model(this, time, last_time);
         pdf.normalize();
         r *= pdf.eta;
@@ -153,8 +157,8 @@ struct Target_ {
         }
     }
 
-    template<typename POINTS, typename RES>
-    void pos_phd(const POINTS& points, RES& res) const {
+    void pos_phd(const Eigen::Array<double, 2, Eigen::Dynamic>& points,
+                 Eigen::Array<double, 1, Eigen::Dynamic>& res) const {
         pdf.sampled_pos_pdf(points, res, r);
     }
 

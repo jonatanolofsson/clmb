@@ -63,7 +63,9 @@ struct TargetTree_ {
         targets.push_back(t);
         t->id = id_counter++;
         auto llaabbox = t->llaabbox();
-        //std::cout << "New target: " << *t << ": " << llaabbox << std::endl;
+#ifdef DEBUG_OUTPUT
+        std::cout << "New target: " << *t << ": " << llaabbox << std::endl;
+#endif
         tree.Insert(llaabbox.min, llaabbox.max, t);
     }
 
