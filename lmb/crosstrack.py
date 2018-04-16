@@ -119,7 +119,9 @@ class Application:
             gospa.append(self.tracker.gospa(ll_targets, 1, 1))
 
             phd = self.tracker.pos_phd(phdpoints)
-            with open(f"phdfiles/crosstrack_phd_{k}.json", 'w') as phdfile:
+            print("points size: ", phdpoints.shape)
+            print("phd size: ", phd.shape)
+            with open(f"phdfiles/crosstrack_phd_{k:05}.json", 'w') as phdfile:
                 json.dump({"points": phdpoints.tolist(), "phd": phd.tolist()}, phdfile)
 
             plot.plot_scan(reports, origin)
