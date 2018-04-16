@@ -86,6 +86,7 @@ TEST(LMBTests, PHD) {
     Eigen::Matrix<double, 1, Eigen::Dynamic> res = lmb.pos_phd(points);
 
     EXPECT_NEAR(res.sum(), lmb.params.rB_max, 1e-8);
+    EXPECT_EQ(res.size(), 201*201);
 }
 
 TEST(LMBTests, OSPA) {

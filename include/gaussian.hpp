@@ -82,7 +82,10 @@ struct alignas(16) Gaussian_ {
         auto quadform = L.solve(diff).colwise().squaredNorm().array();
         auto pdf = ((-0.5*quadform - points.rows()*logSqrt2Pi).exp()
             / L.determinant()).eval();
-        res.array() += pdf * scale / pdf.sum();
+        double psum = pdf.sum();
+        if (psum > 1e-7) {
+            res.array() += pdf * scale / psum;
+        }
     }
 
     double overlap(const BBox& bbox) const {

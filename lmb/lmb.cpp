@@ -12,9 +12,9 @@
 #include "lmb.hpp"
 #include "gaussian.hpp"
 #include "gm.hpp"
+#include "pf.hpp"
 #include "models.hpp"
 #include "params.hpp"
-#include "pf.hpp"
 #include "sensors.hpp"
 
 namespace py = pybind11;
@@ -24,6 +24,7 @@ struct HaltException : public std::exception {};
 
 static const int STATES = 4;
 using Tracker = SILMB<GM<STATES>>;
+//using Tracker = SILMB<PF<STATES>>;
 using Gaussian = Gaussian_<STATES>;
 using TargetSummary = TargetSummary_<STATES>;
 using GaussianReport = GaussianReport_<2>;
