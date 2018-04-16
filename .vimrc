@@ -1,9 +1,7 @@
 let g:TOP = expand("<sfile>:p:h")
 let s:includes =
 \   " -I" . g:TOP . "/include" .
-\   " -I" . g:TOP . "/libs/rapidjson/include" .
-\   " -I" . g:TOP . "/libs/pybind11/include -I/usr/include/python3.6m -I/usr/include/python3.6m" .
-\   " -I" . g:TOP . "/libs/swss"
+\   " -I" . g:TOP . "/libs/pybind11/include -I/usr/include/python3.6m -I/usr/include/python3.6m"
 let s:cpp_options =
 \   " -std=c++17" .
 \   " -Wall" .

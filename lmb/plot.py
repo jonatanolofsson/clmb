@@ -1,4 +1,4 @@
-"""Helper functions for MHT plots."""
+"""Helper functions for LMB plots."""
 
 """
     This program is free software: you can redistribute it and/or modify
@@ -15,12 +15,12 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
+from . import cf
 import matplotlib.colors
 from numpy.random import RandomState
 import matplotlib.pyplot as plt
 from matplotlib.patches import Ellipse, Polygon
 import numpy as np
-import cf
 
 
 CMAP = matplotlib.colors.ListedColormap(RandomState(0).rand(256*256, 3))

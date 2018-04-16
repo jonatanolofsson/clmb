@@ -194,10 +194,10 @@ class SILMB {
     }
 
     Eigen::Array<double, 1, Eigen::Dynamic> pos_phd(const Eigen::Array<double, 2, Eigen::Dynamic>& points) {
-        Eigen::Array<double, 2, Eigen::Dynamic> nepoints(2, points.size());
-        Eigen::Array<double, 1, Eigen::Dynamic> res(1, points.size());
+        Eigen::Array<double, 2, Eigen::Dynamic> nepoints(2, points.cols());
+        Eigen::Array<double, 1, Eigen::Dynamic> res(1, points.cols());
         res.setZero();
-        if (points.size() == 0) {
+        if (points.cols() == 0) {
             return res;
         }
 
