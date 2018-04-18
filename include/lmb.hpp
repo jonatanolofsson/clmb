@@ -155,10 +155,30 @@ class SILMB {
         return res;
     }
 
-    unsigned nof_targets(const double r_lim) {
+    double enof_targets(const AABBox& aabbox) {
+        double res = 0;
+        targettree.lock();
+        for (auto& t : targettree.query(aabbox)) {
+            res += t->r;
+        }
+        targettree.unlock();
+        return res;
+    }
+
+    unsigned nof_targets(const double r_lim = 0.7) {
         unsigned res = 0;
         targettree.lock();
         for (auto& t : targettree.targets) {
+            if (t->r >= r_lim) { ++res; }
+        }
+        targettree.unlock();
+        return res;
+    }
+
+    unsigned nof_targets(const AABBox& aabbox, const double r_lim = 0.7) {
+        unsigned res = 0;
+        targettree.lock();
+        for (auto& t : targettree.query(aabbox)) {
             if (t->r >= r_lim) { ++res; }
         }
         targettree.unlock();

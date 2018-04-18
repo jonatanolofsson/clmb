@@ -19,6 +19,7 @@
 
 namespace py = pybind11;
 using namespace lmb;
+using namespace py::literals;
 
 struct HaltException : public std::exception {};
 
@@ -55,6 +56,7 @@ PYBIND11_MODULE(lmb, m) {
              &BBox::template from_gaussian<Eigen::Vector2d, Eigen::Matrix2d>,
              py::arg("mean"), py::arg("cov"), py::arg("nstd") = 2.0)
         .def("nebbox", &BBox::nebbox)
+        .def("aabbox", &BBox::aabbox)
         .def("__repr__", &print<BBox>);
     py::class_<AABBox>(m, "AABBox")
         .def(py::init())
@@ -97,8 +99,10 @@ PYBIND11_MODULE(lmb, m) {
         .def("correct", &Tracker::template correct<PosSensor>, py::call_guard<py::gil_scoped_release>())  // NOLINT
         .def("predict", (void (Tracker::*)(NM<Tracker::Target>&, double, double)) &Tracker::predict<NM<Tracker::Target>>, py::call_guard<py::gil_scoped_release>())  // NOLINT
         .def("predict", (void (Tracker::*)(CV<Tracker::Target>&, double, double)) &Tracker::predict<CV<Tracker::Target>>, py::call_guard<py::gil_scoped_release>())  // NOLINT
-        .def("enof_targets", &Tracker::enof_targets)
-        .def("nof_targets", &Tracker::nof_targets)
+        .def("enof_targets", (double (Tracker::*)())&Tracker::enof_targets)
+        .def("enof_targets", (double (Tracker::*)(const AABBox&))&Tracker::enof_targets)
+        .def("nof_targets", (unsigned (Tracker::*)(double))&Tracker::nof_targets, "r_lim"_a = 0.7)
+        .def("nof_targets", (unsigned (Tracker::*)(const AABBox&, double))&Tracker::nof_targets, "aabbox"_a, "r_lim"_a = 0.7)
         .def("get_targets", (typename Tracker::TargetSummaries (Tracker::*)())&Tracker::get_targets)
         .def("get_targets", (typename Tracker::TargetSummaries (Tracker::*)(const AABBox&))&Tracker::get_targets)
         .def("pos_phd", &Tracker::pos_phd)

@@ -61,7 +61,6 @@ def plot_history(history, origin, c=0, covellipse=True, min_r=0, max_back=None, 
             del lines[t.id]
     for id_, (rs, xs, Ps, cids) in lines.items():
         cl = c + id_
-        print("Line: ", id_, " :: ", xs)
         if trace:
             plt.plot([x[0] for x in xs], [x[1] for x in xs], color=CMAP(cl), **kwargs)
             for cid, x in zip(cids, xs):
@@ -92,7 +91,7 @@ def plot_traces(targets, cseed=0, covellipse=True, max_back=None, **kwargs):
 def plot_cov_ellipse(cov, pos, nstd=2, **kwargs):
     """Plot confidence ellipse."""
     r1, r2, theta = cov_ellipse(cov, nstd)
-    ellip = Ellipse(xy=pos, width=2*r1, height=2*r2, angle=theta, **kwargs)
+    ellip = Ellipse(xy=np.flipud(pos), width=2*r2, height=2*r1, angle=theta, **kwargs)
 
     plt.gca().add_artist(ellip)
     return ellip
@@ -107,8 +106,8 @@ def plot_scan(reports, origin, covellipse=True, **kwargs):
     }
     options.update(kwargs)
     zs = [cf.ll2ne(r.x[0:2], origin) for r in reports]
-    plt.plot([float(z[0]) for z in zs],
-             [float(z[1]) for z in zs], **options)
+    plt.plot([float(z[1]) for z in zs],
+             [float(z[0]) for z in zs], **options)
     if covellipse:
         for r in reports:
             ca = plot_cov_ellipse(r.R[0:2, 0:2], cf.ll2ne(r.x[0:2], origin))

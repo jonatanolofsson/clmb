@@ -143,12 +143,13 @@ struct PF {
 
     void resample() {
         if (!valid) { return; }
-        auto cdf = std::partial_sum(std::begin(w), std::end(w));
+        std::vector<double> cdf(w.size());
+        std::partial_sum(std::begin(w), std::end(w), std::begin(cdf));
         auto w0 = 1.0 / N;
         double u0 = urand() * w0;
         unsigned j = 0;
 
-        States x2;
+        States x2; x2.resize(STATES, N);
         PARFOR
         for (unsigned i = 0; i < N; ++i) {
             double u = u0 + i * w0;
@@ -207,6 +208,7 @@ struct PF {
             }
         }
         pdf.normalize();
+        pdf.resample();
     }
 
     State mean() const {
@@ -241,6 +243,11 @@ struct PF {
         for (unsigned i = 0; i < N; ++i) {
             cf::ll2ne_i(x.col(i).template head<2>(), origin);
         }
+    }
+
+    cf::LL transform_to_local() {
+        transform_to_local(pos());
+        return origin;
     }
 
     void transform_to_global() {
