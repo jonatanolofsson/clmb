@@ -24,9 +24,10 @@ struct PositionSensor {
     Eigen::Matrix2d pv;
     double lambdaB = 1.0;
     double pD_ = 1.0;
+    double kappa_ = 1.0;
 
     PositionSensor()
-    : pv(Eigen::Matrix2d::Identity() * 10)
+    : pv(Eigen::Matrix2d::Identity())
     {
         fov.corners << 90, 90, -90, -90,
                        180, 0,  0,  180;
@@ -46,7 +47,11 @@ struct PositionSensor {
 
     Targets get_targets(const TargetTree& targettree) const {
         Targets result;
-        auto targets = targettree.query(fov.aabbox());
+        typename TargetTree::Targets targets;
+        CRITICAL(ttree)
+        {
+            targets = targettree.query(fov.aabbox());
+        }
         result.reserve(targets.size());
         //std::cout << "Queried nof targets: " << targets.size() << std::endl;
         std::copy_if(targets.begin(), targets.end(), std::back_inserter(result),
@@ -59,8 +64,8 @@ struct PositionSensor {
     }
 
     template<typename Report>
-    typename Target::PDF pdf(Params* params, const Report& r, const double = 0) const {
-        // FIXME: Better initial covariance (Rasmussen, Williams?)
+    typename Target::PDF pdf_init1(Params* params, const Report& r, const double = 0) const {
+        // FIXME: Better initial velocity (Rasmussen, Williams?)
         typename Target::PDF::State x;
         typename Target::PDF::Covariance P;
         x << r.mean().template head<2>(), 0.0, 0.0;
@@ -68,6 +73,29 @@ struct PositionSensor {
         P.template block<2, 2>(0, 0) = r.cov();
         P.template block<2, 2>(2, 2) = pv;
         return typename Target::PDF(params, x, P);
+    }
+
+    template<typename Report>
+    void pdf_init2(typename Target::PDF& pdf, const Report& z, const double time, const double t0) const {
+        return;
+        const double dT = (time - t0) / pdf.params->tscale;
+        if (dT < 1e-5) { std::cout << "init2 failed: " << dT << std::endl; return; }
+        auto x = pdf.mean();
+        std::cout << "Secondary init (" << dT << ") using " << z.mean().format(eigenformat) << ": " << x.format(eigenformat);
+        x.template tail<2>() = (z.mean() - x.template head<2>()) / dT;
+        Eigen::Matrix4d F;
+        F << 1, 0, dT, 0,
+             0, 1, 0, dT,
+             0, 0, 1, 0,
+             0, 0, 0, 1;
+        x = F * x;
+        std::cout << " -> " << x.format(eigenformat) << std::endl;
+        pdf.set_state(x);
+    }
+
+    template<typename Report>
+    double kappa(const Report&) const {
+        return kappa_;
     }
 };
 }  // namespace lmb

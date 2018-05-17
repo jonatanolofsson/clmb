@@ -16,15 +16,19 @@ struct alignas(16) GaussianReport_ : public Gaussian_<S> {
     using Covariance = typename Gaussian::Covariance;
 
     volatile double rB;
-    double kappa = 1;
-    unsigned cluster_id;
+    double kappa = 1.0;
+    unsigned cluster_id = 0;
 
     GaussianReport_() {}
 
-    GaussianReport_(const State x_, const Covariance P_, double kappa_)
+    template<typename Sensor>
+    GaussianReport_(const Sensor& sensor, const State x_, const Covariance P_)
     : Gaussian(x_, P_) {
-        kappa = kappa_;
+        kappa = sensor.kappa(*this);
     }
+
+    GaussianReport_(const State x_, const Covariance P_, double kappa_ = 1.0)
+    : Gaussian(x_, P_), kappa(kappa_) {}
 
     template<typename DZ, typename DINV>
     double likelihood(const DZ& dz, const DINV& Dinv) const {

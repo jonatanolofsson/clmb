@@ -60,7 +60,7 @@ TEST(LMBTests, RunLMB) {
         //}
         last_time = t;
     }
-    EXPECT_EQ(lmb.targettree.targets.size(), 3);
+    EXPECT_EQ(lmb.targettree.targets.size(), 1);
 }
 
 TEST(LMBTests, PHD) {

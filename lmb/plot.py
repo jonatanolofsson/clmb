@@ -1,5 +1,4 @@
 """Helper functions for LMB plots."""
-
 """
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -14,13 +13,12 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
-
-from . import cf
 import matplotlib.colors
+import numpy as np
 from numpy.random import RandomState
 import matplotlib.pyplot as plt
 from matplotlib.patches import Ellipse, Polygon
-import numpy as np
+from . import cf
 
 
 CMAP = matplotlib.colors.ListedColormap(RandomState(0).rand(256*256, 3))
@@ -42,50 +40,57 @@ def cov_ellipse(cov, nstd):
     return r1, r2, theta
 
 
-def plot_history(history, origin, c=0, covellipse=True, min_r=0, max_back=None, r_values=False, track_id=False, velocity=False, trace=True, **kwargs):
-    """Plot single trace."""
-    max_back = max_back or 0
+def plot_tracks(history, origin, c=0, covellipse=True, bbox=False, clustercolor=False, min_r=0, r_values=False, show_id=False, show_cid=False, velocity=False, **kwargs):
+    """Plot all tracks present at end time."""
+    if not history:
+        return
+    if "fov" in history[-1] and history[-1]["fov"]:
+        plot_bbox(history[-1]["fov"].nebbox(origin))
     lines = {}
-    for recall in history[-max_back:]:
+    ids = [t.id for t in history[-1]["targets"] if t.r >= min_r]
+    if not ids:
+        return
+    lines = {i: [] for i in ids}
+    for recall in history:
         for t in recall["targets"]:
-            if t.id not in lines:
-                lines[t.id] = [[], [], [], []]
-            lines[t.id][0].append(t.r)
-            lines[t.id][1].append(np.concatenate((cf.ll2ne(t.x[0:2], origin), t.x[2:])))
-            lines[t.id][2].append(t.P)
-            lines[t.id][3].append(t.cid)
-        if "fov" in recall:
-            plot_bbox(recall["fov"].nebbox(origin).corners)
-    for t in recall["targets"]:
-        if t.r < min_r:
-            del lines[t.id]
-    for id_, (rs, xs, Ps, cids) in lines.items():
-        cl = c + id_
-        if trace:
-            plt.plot([x[0] for x in xs], [x[1] for x in xs], color=CMAP(cl), **kwargs)
-            for cid, x in zip(cids, xs):
-                plt.plot(x[0], x[1], 's', fillstyle='none', color=CMAP(cid), **kwargs)
+            if t.id not in ids:
+                continue
+            nex = np.concatenate((cf.ll2ne(t.x[0:2], origin), t.x[2:]))
+            lines[t.id].append((t, nex))
+    # print("max line len: ", max(len(l) for l in lines.values()))
+    for track in lines.values():
+        cl = CMAP(c + getattr(track[-1][0], "cid" if clustercolor else "id"))
+        plt.plot([nex[1] for _, nex in track], [nex[0] for _, nex in track], color=cl, **kwargs)
+
+        t, nex = track[-1]
+        plt.plot(nex[1], nex[0], 's', fillstyle='none', color=cl, **kwargs)
 
         if covellipse:
-            ca = plot_cov_ellipse(Ps[-1][0:2, 0:2], xs[-1][0:2], 4)
-            ce = plot_cov_ellipse(Ps[-1][0:2, 0:2], xs[-1][0:2], 4)
+            ca = plot_cov_ellipse(t.P[0:2, 0:2], nex[0:2], 2)
+            ce = plot_cov_ellipse(t.P[0:2, 0:2], nex[0:2], 2)
             ca.set_alpha(0.2)
-            ca.set_facecolor(CMAP(cl))
+            ca.set_facecolor(cl)
             ce.set_facecolor('none')
-            ce.set_edgecolor(CMAP(cl))
-            ce.set_linewidth(4)
+            ce.set_edgecolor(cl)
+            ce.set_linewidth(1)
+
+        if bbox:
+            plot_bbox(t.nebbox(origin), t.cid if clustercolor else t.id, c=c, **kwargs)
 
         if r_values:
-            plt.text(xs[-1][0]+20, xs[-1][1], '{0:.2f}'.format(rs[-1]), color=CMAP(cl), fontsize=16)
+            plt.text(nex[1]+20, nex[0], '{0:.2f}'.format(t.r), color=cl, fontsize=16)
 
-        if track_id:
-            plt.text(xs[-1][0]+20, xs[-1][1]+20, str(id_), color=CMAP(cl), )
+        if show_id:
+            plt.text(nex[1]-20, nex[0]+20, str(t.id), color=cl)
+
+        if show_cid:
+            plt.text(nex[1]+20, nex[0]+20, str(t.cid), color=cl)
 
 
-def plot_traces(targets, cseed=0, covellipse=True, max_back=None, **kwargs):
-    """Plot all targets' traces."""
-    for t in targets:
-        plot_trace(t, t.id + cseed, covellipse, max_back, **kwargs)
+def plot_clusters(history, origin, c=0):
+    """Plot all clusters."""
+    clusters = {t.cid: {"cid": t.cid, "targets": [], "reports": []} for t in history[-1]["targets"] + history[-1]["reports"]}
+    print("clusters: ", clusters)
 
 
 def plot_cov_ellipse(cov, pos, nstd=2, **kwargs):
@@ -97,29 +102,35 @@ def plot_cov_ellipse(cov, pos, nstd=2, **kwargs):
     return ellip
 
 
-def plot_scan(reports, origin, covellipse=True, **kwargs):
+def plot_scan(reports, origin, covellipse=True, bbox=False, clustercolor=False, show_id=False, show_cid=False, c=0, **kwargs):
     """Plot reports from scan."""
-    options = {
-        'marker': '+',
-        'color': 'r',
-        'linestyle': 'None'
-    }
-    options.update(kwargs)
     zs = [cf.ll2ne(r.x[0:2], origin) for r in reports]
-    plt.plot([float(z[1]) for z in zs],
-             [float(z[0]) for z in zs], **options)
-    if covellipse:
-        for r in reports:
-            ca = plot_cov_ellipse(r.R[0:2, 0:2], cf.ll2ne(r.x[0:2], origin))
+    for rid, r in enumerate(reports):
+        nex = cf.ll2ne(r.x[0:2], origin)
+        cl = CMAP(c + (r.cid if clustercolor else rid))
+        plt.plot([nex[1]], [nex[0]], marker='+', color='r', **kwargs)
+        if covellipse:
+            ca = plot_cov_ellipse(r.R[0:2, 0:2], nex)
             ca.set_alpha(0.1)
-            ca.set_facecolor(options['color'])
+            ca.set_facecolor(cl)
+
+        if bbox:
+            # plot_bbox(r.nebbox(origin), rid, c=c, **kwargs)
+            plot_bbox(r.nebbox(origin), r.cid, c=c, **kwargs)
+
+        if show_id:
+            plt.text(nex[1]-20, nex[0]+20, str(rid), color=cl)
+
+        if show_cid:
+            plt.text(nex[1]-40, nex[0]-40, str(r.cid), color=cl)
 
 
-def plot_bbox(corners, id_=0, cseed=0, **kwargs):
+def plot_bbox(corners, id_=0, c=0, **kwargs):
     """Plot bounding box."""
+    corners = corners.corners if hasattr(corners, "corners") else corners
     options = {
         'alpha': 0.3,
-        'color': CMAP(id_ + cseed)
+        'color': CMAP(id_ + c)
     }
     options.update(kwargs)
-    plt.gca().add_patch(Polygon(corners.T, **options))
+    plt.gca().add_patch(Polygon(np.fliplr(corners.T), **options))

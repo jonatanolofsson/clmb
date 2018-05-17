@@ -6,6 +6,7 @@
 #include "bbox.hpp"
 #include "cf.hpp"
 #include "gaussian.hpp"
+#include "params.hpp"
 
 namespace lmb {
 
@@ -26,7 +27,7 @@ struct alignas(16) TargetSummary_ : public Gaussian_<S> {
     unsigned cid;
 
     TargetSummary_(const State& x_, const Covariance P_,
-                   double w_, unsigned id_, unsigned cid_=0)
+                   double w_, unsigned id_, unsigned cid_ = 0)
     : Parent(x_, P_, w_), r(this->w), id(id_), cid(cid_) {}
 
     void repr(std::ostream& os) const {
@@ -52,6 +53,9 @@ struct Target_ {
     PDF pdf;
     std::vector<PDF> pdfs;
     unsigned cluster_id;
+    const Params* params;
+    bool is_new = true;
+    double t0 = 0;
 
     Action last_action;
 
@@ -59,16 +63,31 @@ struct Target_ {
     : r(0),
       pdfs(0),
       cluster_id(0),
+      params(nullptr),
       last_action(ACTION_INIT)
     {}
 
-    Target_(double r_, PDF&& pdf_)
+    Target_(double r_, PDF&& pdf_, const Params* params_, double t0_)
     : r(r_),
       pdf(pdf_),
       pdfs(0),
       cluster_id(0),
+      params(params_),
+      t0(t0_),
       last_action(ACTION_INIT)
     {}
+
+    bool viable() {
+        if (r < params->r_lim) {
+            //std::cout << "Removing b/c r_lim" << std::endl;
+            return false;
+        }
+        if (pdf.poscov().norm() > params->cov_lim) {
+            //std::cout << "Removing b/c poscov" << std::endl;
+            return false;
+        }
+        return true;
+    }
 
     void transform_to_local(const cf::LL& origin) {
         pdf.transform_to_local(origin);
@@ -93,21 +112,29 @@ struct Target_ {
     void match(const std::vector<typename Sensor::Report*>& reports,
                const Sensor& sensor,
                RES&& res,
-               MRES& mres) {
+               MRES& mres,
+               const double time) {
         unsigned M = reports.size();
 #ifdef DEBUG_OUTPUT
+        if (cluster_id == 0) {
         std::cout << "Match against: " << pdf << std::endl;
+        }
 #endif
         pdfs.clear();
         pdfs.resize(M + 1, pdf);
 
+        PARFOR
         for (unsigned j = 0; j < M; ++j) {
+            if (is_new) { sensor.pdf_init2(pdfs[j], *reports[j], time, t0); }
             res(0, j) = -std::log(r * pdfs[j].correct(*reports[j], sensor));
         }
+        is_new = false;
 #ifdef DEBUG_OUTPUT
+        if (cluster_id == 0) {
         std::cout << "Candidate corrections: " << std::endl;
         for (unsigned j = 0; j < M + 1; ++j) {
             std::cout << "\t" << pdfs[j] << std::endl;
+        }
         }
 #endif
         mres = -std::log(r * pdfs[M].missed(sensor));
@@ -127,6 +154,10 @@ struct Target_ {
         return pdf.llaabbox();
     }
 
+    AABBox neaabbox(const cf::LL& origin) {
+        return llaabbox().neaabbox(origin);
+    }
+
     template<typename W>
     void correct(const W& w, double rlim = 1e-6) {
         r = w.sum();
@@ -134,7 +165,7 @@ struct Target_ {
             PDF::join(pdf, w, pdfs);
             last_action = ACTION_CORRECT;
         } else {
-            r = -inf;
+            r = 0;
         }
     }
 

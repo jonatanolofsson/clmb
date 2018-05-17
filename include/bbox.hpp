@@ -95,6 +95,13 @@ struct AABBox {
         // if (cmin[1] > cmax[1]) { cmax[1] += MAX_LONGITUDE; }  // FIXME: Lots of special cases!
         return AABBox(cmin[0], cmin[1], cmax[0], cmax[1]);
     }
+
+    AABBox neaabbox(const cf::LL& origin) const {
+        auto cmin = cf::ll2ne((Eigen::Vector2d() << min[0], min[1]).finished(), origin);  // NOLINT
+        auto cmax = cf::ll2ne((Eigen::Vector2d() << max[0], max[1]).finished(), origin);  // NOLINT
+        // if (cmin[1] > cmax[1]) { cmax[1] += MAX_LONGITUDE; }  // FIXME: Lots of special cases!
+        return AABBox(cmin[0], cmin[1], cmax[0], cmax[1]);
+    }
 };
 
 auto& operator<<(std::ostream& os, const AABBox& aabbox) {

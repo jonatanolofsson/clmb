@@ -30,7 +30,7 @@ struct GM {
     double eta;
     cf::LL origin;
 
-    GM() {}
+    GM() : params(nullptr) {}
     explicit GM(Params* params_) : params(params_) {}
 
     GM(Params* params_, const State& mean, const Covariance& cov)
@@ -91,7 +91,7 @@ struct GM {
 
     template<typename Sensor>
     double correct(const typename Sensor::Report& z, const Sensor& s) {
-        //std::cout << "Correcting: " << z << std::endl;
+        //std::cout << "Correcting against: " << z << std::endl;
         //std::cout << "Pre-correct: " << *this << std::endl;
         PARFOR
         for (unsigned i = 0; i < c.size(); ++i) {
@@ -116,8 +116,14 @@ struct GM {
     void linear_update(const FT& F, const QT& Q) {
         PARFOR
         for (unsigned i = 0; i < c.size(); ++i) {
-            c[i].x = F * c[i].x;
-            c[i].P = F * c[i].P * F.transpose() + Q;
+            c[i].linear_update(F, Q);
+        }
+    }
+
+    void set_state(const State& state) {
+        PARFOR
+        for (unsigned i = 0; i < c.size(); ++i) {
+            c[i].set_state(state);
         }
     }
 
@@ -225,8 +231,16 @@ struct GM {
         return mean().template head<2>();
     }
 
+    Eigen::Vector2d vel() {
+        return mean().template tail<2>();
+    }
+
     Eigen::Matrix2d poscov() const {
         return cov().template topLeftCorner<2, 2>();
+    }
+
+    Eigen::Matrix2d velcov() const {
+        return cov().template bottomRightCorner<2, 2>();
     }
 
     AABBox llaabbox() {

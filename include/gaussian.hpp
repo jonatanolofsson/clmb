@@ -32,6 +32,8 @@ struct alignas(16) Gaussian_ {
         auto dz = (z.mean() - s.measurement(x)).eval();
         auto Dinv = (s.H * P * s.H.transpose() + z.cov()).inverse().eval();
         auto K = P * s.H.transpose() * Dinv;
+        //std::cout << "pD: " << s.pD(*this, origin) << std::endl;
+        //std::cout << "likelihood: " << z.likelihood(dz, Dinv) << std::endl;
         w *= s.pD(*this, origin) * z.likelihood(dz, Dinv) / z.kappa;
         x += K * dz;
         P -= K * s.H * P;
@@ -59,8 +61,32 @@ struct alignas(16) Gaussian_ {
         return P.template topLeftCorner<2, 2>();
     }
 
-    AABBox aabbox(const double nstd = 2.0) {
+    void set_state(const State& state) {
+        x = state;
+    }
+
+    template<typename FT, typename QT>
+    void linear_update(const FT& F, const QT& Q) {
+        //std::cout << "F: " << std::endl << F << std::endl;
+        //std::cout << "Q: " << std::endl << Q << std::endl;
+        //std::cout << "Before update: " << x.format(eigenformat) << std::endl;
+        //std::cout << P << std::endl;
+        x = F * x;
+        P = F * P * F.transpose() + Q;
+        //std::cout << "After update: " << x.format(eigenformat) << std::endl;
+        //std::cout << P << std::endl;
+    }
+
+    BBox bbox(const double nstd = 2.0) const {
+        return BBox(pos(), poscov(), nstd);
+    }
+
+    AABBox aabbox(const double nstd = 2.0) const {
         return AABBox(pos(), poscov(), nstd);
+    }
+
+    BBox nebbox(const cf::LL& origin, const double nstd = 2.0) const {
+        return BBox(cf::ll2ne(pos(), origin), poscov(), nstd);
     }
 
     template<typename RES>

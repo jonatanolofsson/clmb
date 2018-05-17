@@ -23,13 +23,10 @@ struct TargetTree_ {
     Targets targets;
     RTree<Target*, double, 2> tree;
     unsigned id_counter;
+    const Params* params;
 
-    TargetTree_()
-    : id_counter(0) {
-#ifndef NOPAR
-        omp_init_lock(&writelock);
-#endif
-    }
+    explicit TargetTree_(const Params* params_)
+    : id_counter(0), params(params_) {}
 
     ~TargetTree_() {
         for (auto t : targets) {
@@ -45,21 +42,23 @@ struct TargetTree_ {
         tree.Remove(llaabbox.min, llaabbox.max, t);
     }
 
-    void replace(Target* const t, double rlim = 0.0) {
-        if (t->r < rlim) {
-            targets.erase(std::remove(targets.begin(),
-                                      targets.end(),
-                                      t),
-                          targets.end());
-            delete t;
-        } else {
-            auto llaabbox = t->llaabbox();
-            tree.Insert(llaabbox.min, llaabbox.max, t);
-        }
+    void remove_all() {
+        tree.RemoveAll();
     }
 
-    void new_target(double r, PDF&& p) {
-        Target* t = new Target(r, std::forward<PDF>(p));
+    void erase(Target* const t) {
+        targets.erase(std::remove(targets.begin(), targets.end(), t),
+                      targets.end());
+        delete t;
+    }
+
+    void replace(Target* const t) {
+        auto llaabbox = t->llaabbox();
+        tree.Insert(llaabbox.min, llaabbox.max, t);
+    }
+
+    Target* new_target(double r, PDF&& p, const double t0 = 0) {
+        Target* t = new Target(r, std::forward<PDF>(p), params, t0);
         targets.push_back(t);
         t->id = id_counter++;
         auto llaabbox = t->llaabbox();
@@ -67,26 +66,13 @@ struct TargetTree_ {
         std::cout << "New target: " << *t << ": " << llaabbox << std::endl;
 #endif
         tree.Insert(llaabbox.min, llaabbox.max, t);
+        return t;
     }
 
-#ifndef NOPAR
-    omp_lock_t writelock;
-#endif
-    void lock() {
-#ifndef NOPAR
-        omp_set_lock(&writelock);
-#endif
-    }
-    void unlock() {
-#ifndef NOPAR
-        omp_unset_lock(&writelock);
-#endif
-    }
-
-    Targets query(const AABBox& aabbox) const {
+    Targets query(const AABBox& llaabbox) const {
         Targets result;
-        tree.Search(aabbox.min,
-                    aabbox.max,
+        tree.Search(llaabbox.min,
+                    llaabbox.max,
                     rtree_callback<Target, Targets>,
                     reinterpret_cast<void*>(&result));
 

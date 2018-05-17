@@ -14,7 +14,6 @@
 #include "cluster.hpp"
 #include "connectedcomponents.hpp"
 #include "lap.hpp"
-#include "murty.hpp"
 #include "omp.hpp"
 #include "params.hpp"
 #include "sensors.hpp"
@@ -24,10 +23,6 @@
 //#define DEBUG_OUTPUT
 
 namespace lmb {
-
-using lap::Murty;
-using lap::Assignment;
-
 template<typename PDF_>
 class SILMB {
  public:
@@ -39,16 +34,20 @@ class SILMB {
     using Gaussian = Gaussian_<PDF::STATES>;
     using TargetStates = std::vector<typename PDF::State>;
     using TargetSummaries = TargetSummaries_<PDF::STATES>;
+    using Params = Params;
 
 
     Params params;
 
     TargetTree targettree;
     unsigned nof_clusters;
+    std::vector<int> cluster_ntargets;
+    std::vector<int> cluster_nreports;
+    std::vector<int> cluster_nhyps;
 
-    SILMB() {}
+    SILMB() : targettree(&params) {}
 
-    explicit SILMB(const Params& params_) : params(params_) {}
+    explicit SILMB(const Params& params_) : params(params_), targettree(&params) {}
 
 
     template<typename Model>
@@ -56,60 +55,40 @@ class SILMB {
 #ifdef DEBUG_OUTPUT
         std::cout << "\n\nPredict::::::::::" << std::endl;
 #endif
-        targettree.lock();
-        for (auto& t : targettree.targets) {
-            targettree.remove(t);
-        }
-        targettree.unlock();
+        CRITICAL(ttree)
+        {
+            auto all_targets = targettree.targets;
+            targettree.remove_all();
 
-        PARFOR
-        for (auto t = std::begin(targettree.targets);
-                t < std::end(targettree.targets); ++t) {
+            PARFOR
+            for (auto t = std::begin(all_targets);
+                    t < std::end(all_targets); ++t) {
 #ifdef DEBUG_OUTPUT
-            std::cout << "P: Pre-local: " << **t << std::endl;
+                std::cout << "P: Pre-local: " << **t << std::endl;
 #endif
-            (*t)->transform_to_local();
+                (*t)->transform_to_local();
 #ifdef DEBUG_OUTPUT
-            std::cout << "P: Post-local: " << **t << std::endl;
+                std::cout << "P: Post-local: " << **t << std::endl;
 #endif
-            (*t)->template predict<Model>(model, time, last_time);
+                (*t)->template predict<Model>(model, time, last_time);
 #ifdef DEBUG_OUTPUT
-            std::cout << "P: Pre-global: " << **t << std::endl;
+                std::cout << "P: Pre-global: " << **t << std::endl;
 #endif
-            (*t)->transform_to_global();
+                (*t)->transform_to_global();
 #ifdef DEBUG_OUTPUT
-            std::cout << "P: Post-global: " << **t << std::endl;
+                std::cout << "P: Post-global: " << **t << std::endl;
 #endif
-        }
+            }
 
-        targettree.lock();
-        for (auto& t : targettree.targets) {
-            targettree.replace(t);
+            for (auto& t : all_targets) {
+                if (t->viable()) {
+                    targettree.replace(t);
+                } else {
+                    targettree.erase(t);
+                }
+            }
         }
-        targettree.unlock();
     }
-
-    //template<typename Model>
-    //void predict(Model& model, const AABBox& aabbox, double time) {
-        //auto all_targets = targettree.query(aabbox);
-
-        //targettree.lock();
-        //for (auto& t : all_targets) {
-            //targettree.remove(t);
-        //}
-        //targettree.unlock();
-
-        //PARFOR
-        //for (auto t = std::begin(all_targets); t < std::end(all_targets); ++t) {
-            //(*t)->template predict<Model>(model, time);
-        //}
-
-        //targettree.lock();
-        //for (auto& t : all_targets) {
-            //targettree.replace(t);
-        //}
-        //targettree.unlock();
-    //}
 
     template<typename Sensor>
     void correct(const Sensor& sensor, typename Sensor::Scan& scan, double time) {  // NOLINT
@@ -128,17 +107,26 @@ class SILMB {
             std::cout << "\t" << *t << ": " << t->llaabbox() << std::endl;
         }
         std::cout << "All targets: " << std::endl;
-        for (auto& t : targettree.targets) {
-            std::cout << "\t" << *t << ": " << t->llaabbox() << std::endl;
+        CRITICAL(ttree)
+        {
+            for (auto& t : targettree.targets) {
+                std::cout << "\t" << *t << ": " << t->llaabbox() << std::endl;
+            }
         }
 #endif
 
         Clusters clusters;
         cluster<Sensor>(scan, affected_targets, clusters);
+        cluster_ntargets.resize(clusters.size());
+        cluster_nreports.resize(clusters.size());
+        cluster_nhyps.resize(clusters.size());
 
         PARFOR
         for (auto c = std::begin(clusters); c < std::end(clusters); ++c) {
-            cluster_correct<Sensor>(*c, sensor);
+            cluster_ntargets[c->id] = c->targets.size();
+            cluster_nreports[c->id] = c->reports.size();
+            c->correct(targettree, sensor, time);
+            cluster_nhyps[c->id] = c->n;
         }
 
         // Reports have now moved to their respective clusters' NE system
@@ -147,69 +135,75 @@ class SILMB {
 
     double enof_targets() {
         double res = 0;
-        targettree.lock();
-        for (auto& t : targettree.targets) {
-            res += t->r;
+        CRITICAL(ttree)
+        {
+            for (auto& t : targettree.targets) {
+                res += t->r;
+            }
         }
-        targettree.unlock();
         return res;
     }
 
     double enof_targets(const AABBox& aabbox) {
         double res = 0;
-        targettree.lock();
-        for (auto& t : targettree.query(aabbox)) {
-            res += t->r;
+        CRITICAL(ttree)
+        {
+            for (auto& t : targettree.query(aabbox)) {
+                res += t->r;
+            }
         }
-        targettree.unlock();
         return res;
     }
 
     unsigned nof_targets(const double r_lim = 0.7) {
         unsigned res = 0;
-        targettree.lock();
-        for (auto& t : targettree.targets) {
-            if (t->r >= r_lim) { ++res; }
+        CRITICAL(ttree)
+        {
+            for (auto& t : targettree.targets) {
+                if (t->r >= r_lim) { ++res; }
+            }
         }
-        targettree.unlock();
         return res;
     }
 
     unsigned nof_targets(const AABBox& aabbox, const double r_lim = 0.7) {
         unsigned res = 0;
-        targettree.lock();
-        for (auto& t : targettree.query(aabbox)) {
-            if (t->r >= r_lim) { ++res; }
+        CRITICAL(ttree)
+        {
+            for (auto& t : targettree.query(aabbox)) {
+                if (t->r >= r_lim) { ++res; }
+            }
         }
-        targettree.unlock();
         return res;
     }
 
     TargetSummaries get_targets() {
         TargetSummaries res;
-        targettree.lock();
-        for (auto& t : targettree.targets) {
-            res.emplace_back(t->pdf.mean(),
-                             t->pdf.cov(),
-                             t->r,
-                             t->id,
-                             t->cluster_id);
+        CRITICAL(ttree)
+        {
+            for (auto& t : targettree.targets) {
+                res.emplace_back(t->pdf.mean(),
+                                 t->pdf.cov(),
+                                 t->r,
+                                 t->id,
+                                 t->cluster_id);
+            }
         }
-        targettree.unlock();
         return res;
     }
 
     TargetSummaries get_targets(const AABBox& aabbox) {
         TargetSummaries res;
-        targettree.lock();
-        for (auto& t : targettree.query(aabbox)) {
-            res.emplace_back(t->pdf.mean(),
-                             t->pdf.cov(),
-                             t->r,
-                             t->id,
-                             t->cluster_id);
+        CRITICAL(ttree)
+        {
+            for (auto& t : targettree.query(aabbox)) {
+                res.emplace_back(t->pdf.mean(),
+                                 t->pdf.cov(),
+                                 t->r,
+                                 t->id,
+                                 t->cluster_id);
+            }
         }
-        targettree.unlock();
         return res;
     }
 
@@ -221,36 +215,32 @@ class SILMB {
             return res;
         }
 
-        targettree.lock();
+        CRITICAL(ttree)
+        {
+            // Load all affected targets
+            AABBox aabbox; aabbox.from_points(points);
+            Targets targets = targettree.query(aabbox);
+            if (targets.size() > 0) {
+                // Transform to local coordinates
+                cf::LL origin; origin.setZero();
+                for (auto t : targets) { origin += t->pos(); }
+                origin /= targets.size();
 
-        // Load all affected targets
-        AABBox aabbox; aabbox.from_points(points);
-        Targets targets = targettree.query(aabbox);
-        if (targets.size() == 0) {
-            targettree.unlock();
-            return res;
+                for (auto t : targets) { t->transform_to_local(origin); }
+
+                for (unsigned i = 0; i != points.cols(); ++i) {
+                    nepoints.col(i) = cf::ll2ne(points.col(i), origin);
+                }
+
+                // for all points, sum sample target phds
+                for (auto t = targets.begin(); t != targets.end(); ++t) {
+                    (*t)->pos_phd(nepoints, res);
+                }
+
+                // Transform back
+                for (auto t : targets) { t->transform_to_global(); }
+            }
         }
-
-        // Transform to local coordinates
-        cf::LL origin; origin.setZero();
-        for (auto t : targets) { origin += t->pos(); }
-        origin /= targets.size();
-
-        for (auto t : targets) { t->transform_to_local(origin); }
-
-        for (unsigned i = 0; i != points.cols(); ++i) {
-            nepoints.col(i) = cf::ll2ne(points.col(i), origin);
-        }
-
-        // for all points, sum sample target phds
-        for (auto t = targets.begin(); t != targets.end(); ++t) {
-            (*t)->pos_phd(nepoints, res);
-        }
-
-        // Transform back
-        for (auto t : targets) { t->transform_to_global(); }
-
-        targettree.unlock();
 
         return res;
     }
@@ -258,52 +248,59 @@ class SILMB {
     double ospa(const TargetStates& truth, const double c, const double p) {
         cf::LL origin; origin.setZero();
         for (auto t : truth) { origin += t.template head<2>(); }
-        for (auto t : targettree.targets) { origin += t->pos(); }
-        origin /= truth.size() + targettree.targets.size();
+        CRITICAL(ttree)
+        {
+            for (auto t : targettree.targets) { origin += t->pos(); }
+            origin /= truth.size() + targettree.targets.size();
+        }
         return ospa(truth, origin, c, p);
     }
 
     double ospa(const TargetStates& truth, const cf::LL& origin, const double c, const double p) {
-        targettree.lock();
+        double score = 0;
         TargetStates netruth(truth);
         for (unsigned i = 0; i != truth.size(); ++i) {
             cf::ll2ne_i(netruth[i], origin);
         }
-        int M = targettree.targets.size();
-        int N = netruth.size();
-        int n = std::max(M, N);
+        CRITICAL(ttree)
+        {
+            int M = targettree.targets.size();
+            int N = netruth.size();
+            int n = std::max(M, N);
 
-        if (n == 0) {
-            return 0;
+            if (n > 0) {
+                Eigen::MatrixXd C(n, n);
+                C.setConstant(c);
+                for (int i = 0; i < M; ++i) {
+                    targettree.targets[i]->transform_to_local(origin);
+                    targettree.targets[i]->distance(netruth, C.block(i, 0, 1, N));
+                    targettree.targets[i]->transform_to_global();
+                }
+                C = C.cwiseMin(c);
+
+                // Note that since exp() is strictly increasing, C and C.^p yields the
+                // same assignments. By only raising the result, we compute fewer
+                // exponentials
+                auto res = lap::lap(C);
+
+                double cost = 0;
+                for (unsigned i = 0; i < res.rows(); ++i) {
+                    cost += std::pow(C(i, res[i]), p);
+                }
+                score = std::pow(cost / n, 1.0 / p);
+            }
         }
-
-        Eigen::MatrixXd C(n, n);
-        C.setConstant(c);
-        for (int i = 0; i < M; ++i) {
-            targettree.targets[i]->transform_to_local(origin);
-            targettree.targets[i]->distance(netruth, C.block(i, 0, 1, N));
-            targettree.targets[i]->transform_to_global();
-        }
-        C = C.cwiseMin(c);
-        targettree.unlock();
-
-        // Note that since exp() is strictly increasing, C and C.^p yields the
-        // same assignments. By only raising the result, we compute fewer
-        // exponentials
-        auto res = lap::lap(C);
-
-        double cost = 0;
-        for (unsigned i = 0; i < res.rows(); ++i) {
-            cost += std::pow(C(i, res[i]), p);
-        }
-        return std::pow(cost / n, 1.0 / p);
+        return score;
     }
 
     double gospa(const TargetStates& truth, const double c, const double p) {
         cf::LL origin; origin.setZero();
         for (auto t : truth) { origin += t.template head<2>(); }
-        for (auto t : targettree.targets) { origin += t->pos(); }
-        origin /= truth.size() + targettree.targets.size();
+        CRITICAL(ttree)
+        {
+            for (auto t : targettree.targets) { origin += t->pos(); }
+            origin /= truth.size() + targettree.targets.size();
+        }
         return gospa(truth, origin, c, p);
     }
 
@@ -312,30 +309,32 @@ class SILMB {
         for (unsigned i = 0; i != truth.size(); ++i) {
             cf::ll2ne_i(netruth[i], origin);
         }
-        targettree.lock();
-        int M = targettree.targets.size();
-        int N = netruth.size();
-        int n = std::max(M, N);
 
-        if (n == 0) {
-            return 0;
+        double score = 0;
+        CRITICAL(ttree)
+        {
+            int M = targettree.targets.size();
+            int N = netruth.size();
+            int n = std::max(M, N);
+
+            if (n > 0) {
+                double cp = std::pow(c, p);
+
+                Eigen::MatrixXd C(n, n);
+                C.setConstant(cp / 2);
+                for (int i = 0; i < M; ++i) {
+                    targettree.targets[i]->transform_to_local(origin);
+                    targettree.targets[i]->distance(netruth, C.block(i, 0, 1, N));
+                    targettree.targets[i]->transform_to_global();
+                }
+                C.block(0, 0, M, N).array() =
+                    C.block(0, 0, M, N).cwiseMin(c).array().pow(p);
+
+                auto res = lap::lap(C);
+                score = std::pow(lap::cost(C, res), 1.0 / p);
+            }
         }
-
-        double cp = std::pow(c, p);
-
-        Eigen::MatrixXd C(n, n);
-        C.setConstant(cp / 2);
-        for (int i = 0; i < M; ++i) {
-            targettree.targets[i]->transform_to_local(origin);
-            targettree.targets[i]->distance(netruth, C.block(i, 0, 1, N));
-            targettree.targets[i]->transform_to_global();
-        }
-        C.block(0, 0, M, N).array() =
-            C.block(0, 0, M, N).cwiseMin(c).array().pow(p);
-        targettree.unlock();
-
-        auto res = lap::lap(C);
-        return std::pow(lap::cost(C, res), 1.0 / p);
+        return score;
     }
 
     void repr(std::ostream& os) const {
@@ -392,15 +391,8 @@ class SILMB {
         }
 
         Reports cluster_reports;
-        unsigned cluster_id = 1;
+        unsigned cluster_id = 0;
         while (cc.get_component(cluster_reports)) {
-#ifdef DEBUG_OUTPUT
-            std::cout << "Cluster: " << std::endl;
-            std::cout << "  Reports:" << std::endl;
-            for (auto& r : cluster_reports) {
-                std::cout << "\t" << *r << std::endl;
-            }
-#endif
             Targets cluster_targets;
 
             // Find all targets
@@ -416,12 +408,6 @@ class SILMB {
             cluster_targets.erase(std::unique(cluster_targets.begin(),
                                               cluster_targets.end()),
                                   cluster_targets.end());
-#ifdef DEBUG_OUTPUT
-            std::cout << "  Targets:" << std::endl;
-            for (auto& t : cluster_targets) {
-                std::cout << "\t" << *t << std::endl;
-            }
-#endif
 
             // All targets except those in a cluster should later
             // be placed in individual clusters
@@ -434,26 +420,36 @@ class SILMB {
 
             auto cluster_obj = clusters.emplace_back(cluster_id,
                                                      cluster_reports,
-                                                     cluster_targets);
+                                                     cluster_targets,
+                                                     &params);
             // Cluster id's for post-processing
             for (auto t = std::begin(cluster_targets); t != std::end(cluster_targets); ++t) {  // NOLINT
                 (*t)->cluster_id = cluster_id;
             }
 
-            ++cluster_id;
 #ifdef DEBUG_OUTPUT
-            std::cout << "Cluster id: " << cluster_id << std::endl;
+            std::cout << "Cluster: " << cluster_id << std::endl;
+            std::cout << "  Reports:" << std::endl;
+            for (auto& r : cluster_reports) {
+                std::cout << "\t" << *r << std::endl;
+            }
+            std::cout << "  Targets:" << std::endl;
+            for (auto& t : cluster_targets) {
+                std::cout << "\t" << *t << std::endl;
+            }
 #endif
+
+            ++cluster_id;
         }
 
         // All targets not in a cluster should be placed in individual clusters
         for (auto t = std::begin(all_targets); t != std::end(all_targets); ++t) {  // NOLINT
-            clusters.emplace_back(cluster_id, Reports(), Targets({*t}));
+            clusters.emplace_back(cluster_id, Reports(), Targets({*t}), &params);
             (*t)->cluster_id = cluster_id;
             ++cluster_id;
         }
 
-        nof_clusters = cluster_id - 1;
+        nof_clusters = cluster_id;
     }
 
     template<typename Sensor, typename Clusters>
@@ -467,121 +463,22 @@ class SILMB {
 
         if (rBsum >= params.r_lim) {
             PARFOR
-            for (auto c = std::begin(clusters); c != std::end(clusters); ++c) {
+            for (auto c = std::begin(clusters); c < std::end(clusters); ++c) {
                 PARFOR
-                for (auto r = std::begin(c->reports); r != std::end(c->reports); ++r) {                    // NOLINT
+                for (auto r = std::begin(c->reports); r < std::end(c->reports); ++r) {                    // NOLINT
                     double nr = (*r)->rB * sensor.lambdaB / rBsum;
                     if (nr >= params.r_lim) {
-                        targettree.new_target(std::min(nr, params.rB_max),
-                                              sensor.pdf(&params, **r, time));
+                        CRITICAL(ttree)
+                        {
+                            auto t = targettree.new_target(
+                                std::min(nr, params.rB_max),
+                                sensor.pdf_init1(&params, **r, time), time);
+                            t->cluster_id = (*r)->cluster_id;
+                        }
                     }
                 }
             }
         }
-    }
-
-    template<typename Sensor, typename Cluster>
-    void cluster_correct(Cluster& c, const Sensor& sensor) {
-        unsigned M = c.targets.size();
-        unsigned N = c.reports.size();
-        unsigned n = M; // If M > 0, this is the number of generated hypotheses
-
-        // Remove from tree while updating
-        targettree.lock();
-        for (unsigned i = 0; i < M; ++i) {
-            targettree.remove(c.targets[i]);
-        }
-        targettree.unlock();
-
-        // Transform to NED coordinates
-#ifdef DEBUG_OUTPUT
-        std::cout << "Pre-local: " << c << std::endl;
-#endif
-        c.transform_to_local();
-#ifdef DEBUG_OUTPUT
-        std::cout << "Post-local: " << c << std::endl;
-#endif
-
-        if (M > 0) {
-            // There are targets to match with
-            // Create cost matrix
-            Eigen::MatrixXd C(M, N + 2 * M);
-            C.setConstant(inf);
-            for (unsigned i = 0; i < M; ++i) {
-                c.targets[i]->match(c.reports,
-                                    sensor,
-                                    C.block(i, 0, 1, N),
-                                    C(i, N + i));
-                C(i, N + M + i) = c.targets[i]->false_target();
-            }
-
-#ifdef DEBUG_OUTPUT
-            std::cout << "C: \n" << C << std::endl;
-#endif
-
-            Murty murty(C);
-            Assignment res;
-            double cost;
-            double w;
-            double w_sum = 0;
-            Eigen::MatrixXd R(M, N + 1);
-            R.setZero();
-            // Draw most relevant hypotheses using Murty's algorithm
-            while (murty.draw(res, cost)) {
-                w = std::exp(-cost);
-                w_sum += w;
-                #pragma omp parallel for
-                for (unsigned i = 0; i < M; ++i) {
-                    if ((unsigned)res[i] < N) {
-                        R(i, res[i]) += w;
-                    } else if ((unsigned)res[i] == N + i) {
-                        R(i, N) += w;
-                    }
-                }
-                ++n;
-                if (w / w_sum < params.w_lim || n >= params.nhyp_max) {
-                    break;
-                }
-            }
-            if (n > 0) {
-                R /= w_sum;
-
-                // Update each target according to the hypotheses' associations
-                for (unsigned i = 0; i < M; ++i) {
-                    c.targets[i]->correct(R.row(i));
-                }
-
-                // Forward birth probabilities to birth algorithm
-                auto rB = (1.0 - R.colwise().sum().array()).eval();
-                for (unsigned j = 0; j < N; ++j) {
-                    c.reports[j]->rB = rB[j];
-                }
-            }
-        }
-
-        // Since n is initialized to M, this also catches M = 0
-        if (n == 0) {
-            // No targets to match with, or no valid hypotheses?
-            for (auto& r : c.reports) {
-                r->rB = 1;
-            }
-        }
-
-        // Move back to LL CF again
-#ifdef DEBUG_OUTPUT
-        std::cout << "Pre-global: " << c << std::endl;
-#endif
-        c.transform_to_global();
-#ifdef DEBUG_OUTPUT
-        std::cout << "Post-global: " << c << std::endl;
-#endif
-
-        // Replace the still valid targets into tree
-        targettree.lock();
-        for (unsigned i = 0; i < M; ++i) {
-            targettree.replace(c.targets[i]);
-        }
-        targettree.unlock();
     }
 };
 

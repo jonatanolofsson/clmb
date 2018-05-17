@@ -14,7 +14,7 @@ CFLAGS += -I$(TOP)/include
 CFLAGS += -isystem/usr/include/eigen3
 CFLAGS += -fopenmp
 CFLAGS += -fPIC
-CFLAGS += -DNOPAR
+#CFLAGS += -DNOPAR
 
 APP_CFLAGS += -I$(TOP)/libs/swss
 PY_CFLAGS = -shared -I$(TOP)/libs/pybind11/include -I/usr/include/python3.6m -I/usr/include/python3.6m -Wno-nested-anon-types  -Wno-unused-result -Wsign-compare -march=x86-64 -mtune=generic -O2 -pipe -fstack-protector-strong -fno-plt -DNDEBUG -g -fwrapv -O3 -Wall -Wstrict-prototypes
