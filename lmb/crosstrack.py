@@ -11,7 +11,7 @@ import lmb
 import cf
 import matplotlib.pyplot as plt
 import numpy as np
-import plot
+from lmb import plot
 import json
 
 logging.basicConfig(level=logging.DEBUG)
@@ -82,10 +82,11 @@ class Application:
         pre_enof_targets = 0
         ospa, gospa = [], []
         last_time = 0
-        phdpoints = np.empty((2, 41 * 41))
+        gridsize = np.array([-5, 5])
+        phdpoints = np.empty((2, 40 * 40 / abs(gridsize[0] * gridsize[1])))
         i = 0
-        for x in range(-20, 21):
-            for y in range(-20, 21):
+        for x in range(20, -20, gridsize[0]):
+            for y in range(-20, 20, gridsize[1]):
                 phdpoints[:, i] = cf.ne2ll(np.array([[x], [y]]), origin)
                 i = i + 1
         for k in range(12):
@@ -122,7 +123,7 @@ class Application:
             print("points size: ", phdpoints.shape)
             print("phd size: ", phd.shape)
             with open(f"phdfiles/crosstrack_phd_{k:05}.json", 'w') as phdfile:
-                json.dump({"points": phdpoints.tolist(), "phd": phd.tolist()}, phdfile)
+                json.dump({"points": phdpoints.tolist(), "gridsize": gridsize.tolist(), "phd": phd.tolist()}, phdfile)
 
             plot.plot_scan(reports, origin)
             plt.plot([t[0] for t in targets],

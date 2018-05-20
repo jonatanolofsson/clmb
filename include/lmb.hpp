@@ -207,39 +207,29 @@ class SILMB {
         return res;
     }
 
-    Eigen::Array<double, 1, Eigen::Dynamic> pos_phd(const Eigen::Array<double, 2, Eigen::Dynamic>& points) {
+    Eigen::Array<double, 1, Eigen::Dynamic> pos_phd(const Eigen::Array<double, 2, Eigen::Dynamic>& points, const Eigen::Vector2d& gridsize) {
         Eigen::Array<double, 2, Eigen::Dynamic> nepoints(2, points.cols());
         Eigen::Array<double, 1, Eigen::Dynamic> res(1, points.cols());
         res.setZero();
-        if (points.cols() == 0) {
-            return res;
-        }
+        if (points.cols() == 0) { return res; }
 
-        CRITICAL(ttree)
-        {
-            // Load all affected targets
-            AABBox aabbox; aabbox.from_points(points);
-            Targets targets = targettree.query(aabbox);
-            if (targets.size() > 0) {
-                // Transform to local coordinates
-                cf::LL origin; origin.setZero();
-                for (auto t : targets) { origin += t->pos(); }
-                origin /= targets.size();
-
-                for (auto t : targets) { t->transform_to_local(origin); }
-
-                for (unsigned i = 0; i != points.cols(); ++i) {
-                    nepoints.col(i) = cf::ll2ne(points.col(i), origin);
-                }
-
-                // for all points, sum sample target phds
-                for (auto t = targets.begin(); t != targets.end(); ++t) {
-                    (*t)->pos_phd(nepoints, res);
-                }
-
-                // Transform back
-                for (auto t : targets) { t->transform_to_global(); }
+        AABBox neaabbox(0.0, 0.0, gridsize.x(), gridsize.y());
+        for (unsigned p = 0; p != points.cols(); ++p) {
+            auto lright = cf::ne2ll(gridsize, points.col(p));
+            AABBox llaabbox(points(0, p), points(1, p), lright(0), lright(1));
+            //std::cout << "phd aabbbox: " << points.col(p).transpose() << " -> " << lright.transpose() << " :: " << aabbox << std::endl;
+            Targets targets = targettree.query(llaabbox);
+            if (targets.size() == 0) { continue; }
+            PARFOR
+            for (std::size_t t = 0; t < targets.size(); ++t) { targets[t]->transform_to_local(points.col(p)); }
+            double phdval = 0;
+            OMP(parallel for reduction(+:phdval))
+            for (std::size_t t = 0; t < targets.size(); ++t) {
+                phdval += targets[t]->r * targets[t]->pdf.overlap(neaabbox);
             }
+            res[p] = phdval;
+            PARFOR
+            for (std::size_t t = 0; t < targets.size(); ++t) { targets[t]->transform_to_global(); }
         }
 
         return res;

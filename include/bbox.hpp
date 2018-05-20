@@ -28,9 +28,9 @@ struct AABBox {
         memcpy(max, obj.max, sizeof(max));
     }
 
-    AABBox(double minX, double minY, double maxX, double maxY)
-    : min{minX, minY},
-      max{maxX, maxY}
+    AABBox(double x1, double y1, double x2, double y2)
+    : min{std::min(x1, x2), std::min(y1, y2)},
+      max{std::max(x1, x2), std::max(y1, y2)}
     {}
 
     template<typename T1, typename T2>

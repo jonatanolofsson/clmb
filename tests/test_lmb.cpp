@@ -67,7 +67,7 @@ TEST(LMBTests, PHD) {
     using Filter = SILMB<GM<4>>;
     Filter lmb;
     cf::LL origin; origin << 58.3887657, 15.6965082;
-    GaussianReport::State m; m = Eigen::Vector2d({70, 10});
+    GaussianReport::State m; m = Eigen::Vector2d({0, 0});
     GaussianReport::Covariance P; P = Eigen::Matrix2d::Identity();
     GaussianReport z(m, P, 3);
     z.transform_to_global(origin);
@@ -75,18 +75,18 @@ TEST(LMBTests, PHD) {
     PositionSensor<Filter::Target> s;
     lmb.correct(s, zs, 1);
 
-    Eigen::Matrix<double, 2, Eigen::Dynamic> points(2, 201*201);
+    Eigen::Vector2d gridsize(-5, 5);
+    Eigen::Matrix<double, 2, Eigen::Dynamic> points(2, int(200*200 / std::abs(gridsize.x() * gridsize.y())));
     unsigned i = 0;
-    for (int x = -100; x <= 100; ++x) {
-        for (int y = -100; y <= 100; ++y) {
+    for (int x = 100; x > -100; x+=gridsize.x()) {
+        for (int y = -100; y < 100; y+=gridsize.y()) {
             points.col(i++) = cf::ne2ll(cf::NE(x, y), origin);
         }
     }
 
-    Eigen::Matrix<double, 1, Eigen::Dynamic> res = lmb.pos_phd(points);
+    Eigen::Matrix<double, 1, Eigen::Dynamic> res = lmb.pos_phd(points, gridsize);
 
-    EXPECT_NEAR(res.sum(), lmb.params.rB_max, 1e-8);
-    EXPECT_EQ(res.size(), 201*201);
+    EXPECT_NEAR(res.sum(), lmb.params.rB_max, 1e-1);
 }
 
 TEST(LMBTests, OSPA) {

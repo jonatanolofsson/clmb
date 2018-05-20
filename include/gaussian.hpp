@@ -114,18 +114,32 @@ struct alignas(16) Gaussian_ {
         }
     }
 
-    double overlap(const BBox& bbox) const {
-        static const int N = 10000;  // FIXME
+    double overlap(const BBox& bbbox) const {
+        static const int N = 1000;  // FIXME
         Eigen::Matrix<double, S, Eigen::Dynamic> samples(S, N);
         sample(samples);
-        int nwithin = 0;
-        PARFOR
+        double nwithin = 0;
+        OMP(parallel for reduction(+:nwithin))
         for (int n = 0; n < N; ++n) {
-            if (bbox.within(samples.col(n))) {
-                ++nwithin;
+            if (bbbox.within(samples.col(n))) {
+                nwithin += 1.0;
             }
         }
-        return static_cast<double>(nwithin) / N;
+        return nwithin / N;
+    }
+
+    double overlap(const AABBox& aabbox) const {
+        static const int N = 1000;  // FIXME
+        Eigen::Matrix<double, S, Eigen::Dynamic> samples(S, N);
+        sample(samples);
+        double nwithin = 0;
+        OMP(parallel for reduction(+:nwithin))
+        for (int n = 0; n < N; ++n) {
+            if (aabbox.within(samples.col(n))) {
+                nwithin += 1.0;
+            }
+        }
+        return nwithin / N;
     }
 
     void repr(std::ostream& os) const {

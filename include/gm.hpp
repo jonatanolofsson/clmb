@@ -243,6 +243,24 @@ struct GM {
         return cov().template bottomRightCorner<2, 2>();
     }
 
+    double overlap(const BBox& bbbox) const {
+        double res = 0;
+        OMP(parallel for reduction(+:res))
+        for (auto cmp = std::begin(c); cmp < std::end(c); ++cmp) {
+            res += cmp->w * cmp->overlap(bbbox);
+        }
+        return res;
+    }
+
+    double overlap(const AABBox& aabbox) const {
+        double res = 0;
+        OMP(parallel for reduction(+:res))
+        for (auto cmp = std::begin(c); cmp < std::end(c); ++cmp) {
+            res += cmp->w * cmp->overlap(aabbox);
+        }
+        return res;
+    }
+
     AABBox llaabbox() {
         return aabbox;
     }
