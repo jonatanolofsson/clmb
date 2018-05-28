@@ -204,6 +204,17 @@ struct GM {
         }
     }
 
+
+    template<typename RES>
+    void sample(RES& res) const {
+        unsigned col = 0;
+        for (unsigned i = 0; i < c.size(); ++i) {
+            unsigned csamples = c[i].w * res.cols();
+            c[i].sample(res.template block(0, col, 1, csamples));
+            col += csamples;
+        }
+    }
+
     State mean() const {
         State res;
         res.setZero();

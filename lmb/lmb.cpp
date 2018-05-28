@@ -58,13 +58,46 @@ PYBIND11_MODULE(lmb, m) {
              py::arg("mean"), py::arg("cov"), py::arg("nstd") = 2.0)
         .def("nebbox", &BBox::nebbox)
         .def("aabbox", &BBox::aabbox)
-        .def("__repr__", &print<BBox>);
+        .def("__repr__", &print<BBox>)
+        .def(py::pickle(
+            [](const BBox& bbox) { // __getstate__
+                /* Return a tuple that fully encodes the state of the object */
+                return py::make_tuple(bbox.corners(0), bbox.corners(1), bbox.corners(2), bbox.corners(3),
+                                      bbox.corners(4), bbox.corners(5), bbox.corners(6), bbox.corners(7));
+            },
+            [](py::tuple t) { // __setstate__
+                if (t.size() != 8) {
+                    throw std::runtime_error("Invalid state!");
+                }
+
+                /* Create a new C++ instance */
+                return BBox((BBox::Corners() <<
+                                t[0].cast<double>(), t[2].cast<double>(), t[4].cast<double>(), t[6].cast<double>(),
+                                t[1].cast<double>(), t[3].cast<double>(), t[5].cast<double>(), t[7].cast<double>()).finished());
+            }
+        ));
     py::class_<AABBox>(m, "AABBox")
         .def(py::init())
         .def(py::init<double, double, double, double>())
         //.def("from_gaussian", &BBox::template from_gaussian<Eigen::Vector2d, Eigen::Matrix2d>)  // NOLINT
         .def("neaabbox", &AABBox::neaabbox)
-        .def("__repr__", &print<BBox>);
+        .def("__repr__", &print<BBox>)
+        .def(py::pickle(
+            [](const AABBox& aabbox) { // __getstate__
+                /* Return a tuple that fully encodes the state of the object */
+                return py::make_tuple(aabbox.min[0], aabbox.min[1],
+                                      aabbox.max[0], aabbox.max[1]);
+            },
+            [](py::tuple t) { // __setstate__
+                if (t.size() != 4) {
+                    throw std::runtime_error("Invalid state!");
+                }
+
+                /* Create a new C++ instance */
+                return AABBox(t[0].cast<double>(), t[1].cast<double>(),
+                              t[2].cast<double>(), t[3].cast<double>());
+            }
+        ));
     py::class_<Tracker::Gaussian>(m, "Gaussian")
         .def(py::init<Tracker::Gaussian::State,
                       Tracker::Gaussian::Covariance,
@@ -78,9 +111,29 @@ PYBIND11_MODULE(lmb, m) {
         .def_readonly("P", &TargetSummary::P)
         .def_readonly("r", &TargetSummary::w)
         .def_readonly("id", &TargetSummary::id)
+        .def_readonly("cid", &TargetSummary::cid)
         .def("nebbox", &TargetSummary::nebbox, "origin"_a, "nstd"_a = 2.0)
         .def_readonly("cid", &TargetSummary::cid)
-        .def("__repr__", &print<TargetSummary>);
+        .def("__repr__", &print<TargetSummary>)
+        .def(py::pickle(
+            [](const TargetSummary& t) { // __getstate__
+                /* Return a tuple that fully encodes the state of the object */
+                return py::make_tuple(t.x, t.P, t.w, t.id, t.cid);
+            },
+            [](py::tuple t) { // __setstate__
+                if (t.size() != 5) {
+                    throw std::runtime_error("Invalid state!");
+                }
+
+                /* Create a new C++ instance */
+                return TargetSummary(
+                    t[0].cast<decltype(TargetSummary::x)>(),
+                    t[1].cast<decltype(TargetSummary::P)>(),
+                    t[2].cast<decltype(TargetSummary::w)>(),
+                    t[3].cast<decltype(TargetSummary::id)>(),
+                    t[4].cast<decltype(TargetSummary::cid)>());
+            }
+        ));
     py::class_<GaussianReport>(m, "GaussianReport")
         .def(py::init<PosSensor&,
                       GaussianReport::State,
@@ -88,12 +141,30 @@ PYBIND11_MODULE(lmb, m) {
         .def(py::init<GaussianReport::State,
                       GaussianReport::Covariance,
                       double>(), "state"_a, "cov"_a, "kappa"_a = 1.0)
-        .def_readonly("cid", &GaussianReport::cluster_id)
         .def_readwrite("x", &GaussianReport::x)
-        .def_readwrite("R", &GaussianReport::P)
+        .def_readwrite("P", &GaussianReport::P)
         .def_readwrite("kappa", &GaussianReport::kappa)
+        .def_readonly("cid", &GaussianReport::cid)
         .def("nebbox", &GaussianReport::nebbox, "origin"_a, "nstd"_a = 2.0)
-        .def("__repr__", &print<GaussianReport>);
+        .def("__repr__", &print<GaussianReport>)
+        .def(py::pickle(
+            [](const GaussianReport& r) { // __getstate__
+                /* Return a tuple that fully encodes the state of the object */
+                return py::make_tuple(r.x, r.P, r.kappa, r.cid);
+            },
+            [](py::tuple t) { // __setstate__
+                if (t.size() != 4)
+                    throw std::runtime_error("Invalid state!");
+
+                /* Create a new C++ instance */
+                GaussianReport r(
+                    t[0].cast<decltype(GaussianReport::x)>(),
+                    t[1].cast<decltype(GaussianReport::P)>(),
+                    t[2].cast<decltype(GaussianReport::kappa)>());
+                r.cid = t[3].cast<decltype(GaussianReport::cid)>();
+                return r;
+            }
+        ));
     py::class_<Params>(m, "Params")
         .def(py::init())
         .def_readwrite("w_lim", &Params::w_lim)

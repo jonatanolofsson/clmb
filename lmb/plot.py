@@ -44,7 +44,7 @@ def plot_tracks(history, origin, c=0, covellipse=True, bbox=False, clustercolor=
     """Plot all tracks present at end time."""
     if not history:
         return
-    if "fov" in history[-1] and history[-1]["fov"]:
+    if history[-1].get("fov"):
         plot_bbox(history[-1]["fov"].nebbox(origin))
     lines = {}
     ids = [t.id for t in history[-1]["targets"] if t.r >= min_r]
@@ -57,7 +57,6 @@ def plot_tracks(history, origin, c=0, covellipse=True, bbox=False, clustercolor=
                 continue
             nex = np.concatenate((cf.ll2ne(t.x[0:2], origin), t.x[2:]))
             lines[t.id].append((t, nex))
-    # print("max line len: ", max(len(l) for l in lines.values()))
     for track in lines.values():
         cl = CMAP(c + getattr(track[-1][0], "cid" if clustercolor else "id"))
         plt.plot([nex[1] for _, nex in track], [nex[0] for _, nex in track], color=cl, **kwargs)
@@ -110,7 +109,7 @@ def plot_scan(reports, origin, covellipse=True, bbox=False, clustercolor=False, 
         cl = CMAP(c + (r.cid if clustercolor else rid))
         plt.plot([nex[1]], [nex[0]], marker='+', color='r', **kwargs)
         if covellipse:
-            ca = plot_cov_ellipse(r.R[0:2, 0:2], nex)
+            ca = plot_cov_ellipse(r.P[0:2, 0:2], nex)
             ca.set_alpha(0.1)
             ca.set_facecolor(cl)
 

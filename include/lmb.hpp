@@ -186,7 +186,7 @@ class SILMB {
                                  t->pdf.cov(),
                                  t->r,
                                  t->id,
-                                 t->cluster_id);
+                                 t->cid);
             }
         }
         return res;
@@ -201,7 +201,7 @@ class SILMB {
                                  t->pdf.cov(),
                                  t->r,
                                  t->id,
-                                 t->cluster_id);
+                                 t->cid);
             }
         }
         return res;
@@ -215,9 +215,9 @@ class SILMB {
 
         AABBox neaabbox(0.0, 0.0, gridsize.x(), gridsize.y());
         for (unsigned p = 0; p != points.cols(); ++p) {
-            auto lright = cf::ne2ll(gridsize, points.col(p));
-            AABBox llaabbox(points(0, p), points(1, p), lright(0), lright(1));
-            //std::cout << "phd aabbbox: " << points.col(p).transpose() << " -> " << lright.transpose() << " :: " << aabbox << std::endl;
+            auto point2 = cf::ne2ll(gridsize, points.col(p));
+            AABBox llaabbox(points(0, p), points(1, p), point2(0), point2(1));
+            //std::cout << "phd aabbbox: " << points.col(p).transpose() << " -> " << point2.transpose() << " :: " << aabbox << std::endl;
             Targets targets = targettree.query(llaabbox);
             if (targets.size() == 0) { continue; }
             PARFOR
@@ -381,7 +381,7 @@ class SILMB {
         }
 
         Reports cluster_reports;
-        unsigned cluster_id = 0;
+        unsigned cid = 0;
         while (cc.get_component(cluster_reports)) {
             Targets cluster_targets;
 
@@ -390,7 +390,7 @@ class SILMB {
                 cluster_targets.insert(cluster_targets.end(),
                                        matching_targets[r].begin(),
                                        matching_targets[r].end());
-                r->cluster_id = cluster_id;
+                r->cid = cid;
             }
 
             // Make target list unique
@@ -408,17 +408,17 @@ class SILMB {
             all_targets.swap(c);
             c.clear();
 
-            auto cluster_obj = clusters.emplace_back(cluster_id,
+            auto cluster_obj = clusters.emplace_back(cid,
                                                      cluster_reports,
                                                      cluster_targets,
                                                      &params);
             // Cluster id's for post-processing
             for (auto t = std::begin(cluster_targets); t != std::end(cluster_targets); ++t) {  // NOLINT
-                (*t)->cluster_id = cluster_id;
+                (*t)->cid = cid;
             }
 
 #ifdef DEBUG_OUTPUT
-            std::cout << "Cluster: " << cluster_id << std::endl;
+            std::cout << "Cluster: " << cid << std::endl;
             std::cout << "  Reports:" << std::endl;
             for (auto& r : cluster_reports) {
                 std::cout << "\t" << *r << std::endl;
@@ -429,17 +429,17 @@ class SILMB {
             }
 #endif
 
-            ++cluster_id;
+            ++cid;
         }
 
         // All targets not in a cluster should be placed in individual clusters
         for (auto t = std::begin(all_targets); t != std::end(all_targets); ++t) {  // NOLINT
-            clusters.emplace_back(cluster_id, Reports(), Targets({*t}), &params);
-            (*t)->cluster_id = cluster_id;
-            ++cluster_id;
+            clusters.emplace_back(cid, Reports(), Targets({*t}), &params);
+            (*t)->cid = cid;
+            ++cid;
         }
 
-        nof_clusters = cluster_id;
+        nof_clusters = cid;
     }
 
     template<typename Sensor, typename Clusters>
@@ -463,7 +463,7 @@ class SILMB {
                             auto t = targettree.new_target(
                                 std::min(nr, params.rB_max),
                                 sensor.pdf_init1(&params, **r, time), time);
-                            t->cluster_id = (*r)->cluster_id;
+                            t->cid = (*r)->cid;
                         }
                     }
                 }

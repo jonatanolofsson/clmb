@@ -17,7 +17,7 @@ struct alignas(16) GaussianReport_ : public Gaussian_<S> {
 
     volatile double rB;
     double kappa = 1.0;
-    unsigned cluster_id = 0;
+    unsigned cid = 0;
 
     GaussianReport_() {}
 

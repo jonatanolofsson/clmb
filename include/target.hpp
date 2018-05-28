@@ -52,7 +52,7 @@ struct Target_ {
     double r;
     PDF pdf;
     std::vector<PDF> pdfs;
-    unsigned cluster_id;
+    unsigned cid;
     const Params* params;
     bool is_new = true;
     double t0 = 0;
@@ -62,7 +62,7 @@ struct Target_ {
     Target_()
     : r(0),
       pdfs(0),
-      cluster_id(0),
+      cid(0),
       params(nullptr),
       last_action(ACTION_INIT)
     {}
@@ -71,7 +71,7 @@ struct Target_ {
     : r(r_),
       pdf(pdf_),
       pdfs(0),
-      cluster_id(0),
+      cid(0),
       params(params_),
       t0(t0_),
       last_action(ACTION_INIT)
@@ -116,7 +116,7 @@ struct Target_ {
                const double time) {
         unsigned M = reports.size();
 #ifdef DEBUG_OUTPUT
-        if (cluster_id == 0) {
+        if (cid == 0) {
         std::cout << "Match against: " << pdf << std::endl;
         }
 #endif
@@ -130,7 +130,7 @@ struct Target_ {
         }
         is_new = false;
 #ifdef DEBUG_OUTPUT
-        if (cluster_id == 0) {
+        if (cid == 0) {
         std::cout << "Candidate corrections: " << std::endl;
         for (unsigned j = 0; j < M + 1; ++j) {
             std::cout << "\t" << pdfs[j] << std::endl;
@@ -194,12 +194,12 @@ struct Target_ {
     }
 
     Gaussian summary() {
-        return TargetSummary(pdf.mean(), pdf.cov(), r, id, cluster_id);
+        return TargetSummary(pdf.mean(), pdf.cov(), r, id, cid);
     }
 
     void repr(std::ostream& os) const {
         os << "{\"id\":" << id
-           << ",\"cid\":" << cluster_id
+           << ",\"cid\":" << cid
            << ",\"la\":\"" << char(last_action) << "\""
            << ",\"r\":" << r
            << ",\"pdf\":" << pdf << "}";
