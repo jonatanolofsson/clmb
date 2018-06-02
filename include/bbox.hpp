@@ -10,22 +10,21 @@
 
 namespace lmb {
 struct AABBox {
-    double min[2];
-    double max[2];
+    std::array<double, 2> min;
+    std::array<double, 2> max;
 
     AABBox()
     : min{-inf, -inf},
       max{inf, inf}
     {}
 
-    AABBox(const AABBox& obj) {
-        memcpy(min, obj.min, sizeof(min));
-        memcpy(max, obj.max, sizeof(max));
-    }
+    AABBox(const AABBox& b)
+    : min(b.min), max(b.max)
+    {}
 
-    void operator=(const AABBox& obj) {
-        memcpy(min, obj.min, sizeof(min));
-        memcpy(max, obj.max, sizeof(max));
+    void operator=(const AABBox& b) {
+        min = b.min;
+        max = b.max;
     }
 
     AABBox(double x1, double y1, double x2, double y2)
@@ -120,6 +119,11 @@ struct BBox {
     BBox()
     : corners((Corners() << -inf, -inf, inf, inf,
                             inf, -inf, -inf, inf).finished())
+    {}
+
+    explicit BBox(const AABBox& b)
+    : corners((Corners() << b.max[0], b.max[0], b.min[0], b.min[0],
+                            b.max[1], b.min[1], b.min[1], b.max[1]).finished())
     {}
 
     template<typename State, typename Covariance>

@@ -31,7 +31,7 @@ def eigsorted(cov):
     return vals[order], vecs[:, order]
 
 
-def cov_ellipse(cov, nstd):
+def calc_cov_ellipse(cov, nstd):
     """Get the covariance ellipse."""
     vals, vecs = eigsorted(cov)
     r1, r2 = nstd * np.sqrt(vals)
@@ -40,12 +40,12 @@ def cov_ellipse(cov, nstd):
     return r1, r2, theta
 
 
-def plot_tracks(history, origin, c=0, covellipse=True, bbox=False, clustercolor=False, min_r=0, r_values=False, show_id=False, show_cid=False, velocity=False, **kwargs):
+def tracks(history, origin, c=0, covellipse=True, draw_bbox=False, clustercolor=False, min_r=0, r_values=False, show_id=False, show_cid=False, velocity=False, **kwargs):
     """Plot all tracks present at end time."""
     if not history:
         return
     if history[-1].get("fov"):
-        plot_bbox(history[-1]["fov"].nebbox(origin))
+        bbox(history[-1]["fov"].nebbox(origin))
     lines = {}
     ids = [t.id for t in history[-1]["targets"] if t.r >= min_r]
     if not ids:
@@ -65,16 +65,16 @@ def plot_tracks(history, origin, c=0, covellipse=True, bbox=False, clustercolor=
         plt.plot(nex[1], nex[0], 's', fillstyle='none', color=cl, **kwargs)
 
         if covellipse:
-            ca = plot_cov_ellipse(t.P[0:2, 0:2], nex[0:2], 2)
-            ce = plot_cov_ellipse(t.P[0:2, 0:2], nex[0:2], 2)
+            ca = cov_ellipse(t.P[0:2, 0:2], nex[0:2], 2)
+            ce = cov_ellipse(t.P[0:2, 0:2], nex[0:2], 2)
             ca.set_alpha(0.2)
             ca.set_facecolor(cl)
             ce.set_facecolor('none')
             ce.set_edgecolor(cl)
             ce.set_linewidth(1)
 
-        if bbox:
-            plot_bbox(t.nebbox(origin), t.cid if clustercolor else t.id, c=c, **kwargs)
+        if draw_bbox:
+            bbox(t.nebbox(origin), t.cid if clustercolor else t.id, c=c, **kwargs)
 
         if r_values:
             plt.text(nex[1]+20, nex[0], '{0:.2f}'.format(t.r), color=cl, fontsize=16)
@@ -86,22 +86,22 @@ def plot_tracks(history, origin, c=0, covellipse=True, bbox=False, clustercolor=
             plt.text(nex[1]+20, nex[0]+20, str(t.cid), color=cl)
 
 
-def plot_clusters(history, origin, c=0):
+def clusters(history, origin, c=0):
     """Plot all clusters."""
     clusters = {t.cid: {"cid": t.cid, "targets": [], "reports": []} for t in history[-1]["targets"] + history[-1]["reports"]}
     print("clusters: ", clusters)
 
 
-def plot_cov_ellipse(cov, pos, nstd=2, **kwargs):
+def cov_ellipse(cov, pos, nstd=2, **kwargs):
     """Plot confidence ellipse."""
-    r1, r2, theta = cov_ellipse(cov, nstd)
+    r1, r2, theta = calc_cov_ellipse(cov, nstd)
     ellip = Ellipse(xy=np.flipud(pos), width=2*r2, height=2*r1, angle=theta, **kwargs)
 
     plt.gca().add_artist(ellip)
     return ellip
 
 
-def plot_scan(reports, origin, covellipse=True, bbox=False, clustercolor=False, show_id=False, show_cid=False, c=0, **kwargs):
+def scan(reports, origin, covellipse=True, draw_bbox=False, clustercolor=False, show_id=False, show_cid=False, c=0, **kwargs):
     """Plot reports from scan."""
     zs = [cf.ll2ne(r.x[0:2], origin) for r in reports]
     for rid, r in enumerate(reports):
@@ -109,13 +109,13 @@ def plot_scan(reports, origin, covellipse=True, bbox=False, clustercolor=False, 
         cl = CMAP(c + (r.cid if clustercolor else rid))
         plt.plot([nex[1]], [nex[0]], marker='+', color='r', **kwargs)
         if covellipse:
-            ca = plot_cov_ellipse(r.P[0:2, 0:2], nex)
+            ca = cov_ellipse(r.P[0:2, 0:2], nex)
             ca.set_alpha(0.1)
             ca.set_facecolor(cl)
 
-        if bbox:
-            # plot_bbox(r.nebbox(origin), rid, c=c, **kwargs)
-            plot_bbox(r.nebbox(origin), r.cid, c=c, **kwargs)
+        if draw_bbox:
+            # draw_bbox(r.nebbox(origin), rid, c=c, **kwargs)
+            bbox(r.nebbox(origin), r.cid, c=c, **kwargs)
 
         if show_id:
             plt.text(nex[1]-20, nex[0]+20, str(rid), color=cl)
@@ -124,7 +124,7 @@ def plot_scan(reports, origin, covellipse=True, bbox=False, clustercolor=False, 
             plt.text(nex[1]-40, nex[0]-40, str(r.cid), color=cl)
 
 
-def plot_bbox(corners, id_=0, c=0, **kwargs):
+def bbox(corners, id_=0, c=0, **kwargs):
     """Plot bounding box."""
     corners = corners.corners if hasattr(corners, "corners") else corners
     options = {
@@ -133,3 +133,9 @@ def plot_bbox(corners, id_=0, c=0, **kwargs):
     }
     options.update(kwargs)
     plt.gca().add_patch(Polygon(np.fliplr(corners.T), **options))
+
+
+def phd(phd_, *args, **kwargs):
+    """Plot phd."""
+    img = plt.gca().imshow(phd_, *args, origin='lower', vmin=0, vmax=phd_.max(), **kwargs)
+    plt.colorbar(img)

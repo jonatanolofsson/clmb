@@ -5,6 +5,7 @@ include_rules
 
 :foreach *.cpp |> !testcc |> {tests}
 :foreach {tests} |> !testrun |>
+:foreach *.png.py *.tex.py *.pdf.py *.eps.py | $(TOP)/<libs> |> !python |> %B
 
 ifdef COVERAGE
 !profiles = |> llvm-profdata merge -sparse %f -o %o |>

@@ -75,18 +75,12 @@ TEST(LMBTests, PHD) {
     PositionSensor<Filter::Target> s;
     lmb.correct(s, zs, 1);
 
-    Eigen::Vector2d gridsize(-5, 5);
-    Eigen::Matrix<double, 2, Eigen::Dynamic> points(2, int(200*200 / std::abs(gridsize.x() * gridsize.y())));
-    unsigned i = 0;
-    for (int x = 100; x > -100; x+=gridsize.x()) {
-        for (int y = -100; y < 100; y+=gridsize.y()) {
-            points.col(i++) = cf::ne2ll(cf::NE(x, y), origin);
-        }
-    }
+    AABBox fov(origin, Eigen::Matrix2d::Identity() * 20);
+    Eigen::Array2i size(100, 100);
 
-    Eigen::Matrix<double, 1, Eigen::Dynamic> res = lmb.pos_phd(points, gridsize);
+    Eigen::MatrixXd res = lmb.pos_phd(fov, size);
 
-    EXPECT_NEAR(res.sum(), lmb.params.rB_max, 1e-1);
+    EXPECT_NEAR(res.sum(), lmb.params.rB_max, 1e-4);
 }
 
 TEST(LMBTests, OSPA) {

@@ -52,6 +52,7 @@ PYBIND11_MODULE(lmb, m) {
     py::class_<BBox>(m, "BBox")
         .def(py::init())
         .def(py::init<BBox::Corners>())
+        .def(py::init<AABBox>())
         .def_readwrite("corners", &BBox::corners)
         .def("from_gaussian",
              &BBox::template from_gaussian<Eigen::Vector2d, Eigen::Matrix2d>,
@@ -62,8 +63,9 @@ PYBIND11_MODULE(lmb, m) {
         .def(py::pickle(
             [](const BBox& bbox) { // __getstate__
                 /* Return a tuple that fully encodes the state of the object */
-                return py::make_tuple(bbox.corners(0), bbox.corners(1), bbox.corners(2), bbox.corners(3),
+                auto res = py::make_tuple(bbox.corners(0), bbox.corners(1), bbox.corners(2), bbox.corners(3),
                                       bbox.corners(4), bbox.corners(5), bbox.corners(6), bbox.corners(7));
+                return res;
             },
             [](py::tuple t) { // __setstate__
                 if (t.size() != 8) {
@@ -80,13 +82,17 @@ PYBIND11_MODULE(lmb, m) {
         .def(py::init())
         .def(py::init<double, double, double, double>())
         //.def("from_gaussian", &BBox::template from_gaussian<Eigen::Vector2d, Eigen::Matrix2d>)  // NOLINT
+        .def("llaabbox", &AABBox::llaabbox)
         .def("neaabbox", &AABBox::neaabbox)
-        .def("__repr__", &print<BBox>)
+        .def("__repr__", &print<AABBox>)
+        .def_readwrite("min", &AABBox::min)
+        .def_readwrite("max", &AABBox::max)
         .def(py::pickle(
             [](const AABBox& aabbox) { // __getstate__
                 /* Return a tuple that fully encodes the state of the object */
-                return py::make_tuple(aabbox.min[0], aabbox.min[1],
+                auto res = py::make_tuple(aabbox.min[0], aabbox.min[1],
                                       aabbox.max[0], aabbox.max[1]);
+                return res;
             },
             [](py::tuple t) { // __setstate__
                 if (t.size() != 4) {
@@ -118,7 +124,8 @@ PYBIND11_MODULE(lmb, m) {
         .def(py::pickle(
             [](const TargetSummary& t) { // __getstate__
                 /* Return a tuple that fully encodes the state of the object */
-                return py::make_tuple(t.x, t.P, t.w, t.id, t.cid);
+                auto res = py::make_tuple(t.x, t.P, t.w, t.id, t.cid);
+                return res;
             },
             [](py::tuple t) { // __setstate__
                 if (t.size() != 5) {
@@ -150,7 +157,8 @@ PYBIND11_MODULE(lmb, m) {
         .def(py::pickle(
             [](const GaussianReport& r) { // __getstate__
                 /* Return a tuple that fully encodes the state of the object */
-                return py::make_tuple(r.x, r.P, r.kappa, r.cid);
+                auto res = py::make_tuple(r.x, r.P, r.kappa, r.cid);
+                return res;
             },
             [](py::tuple t) { // __setstate__
                 if (t.size() != 4)

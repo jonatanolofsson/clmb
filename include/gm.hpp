@@ -204,13 +204,24 @@ struct GM {
         }
     }
 
-
     template<typename RES>
     void sample(RES& res) const {
         unsigned col = 0;
         for (unsigned i = 0; i < c.size(); ++i) {
             unsigned csamples = c[i].w * res.cols();
-            c[i].sample(res.template block(0, col, 1, csamples));
+            auto tmp = res.template block(0, col, 2, csamples);
+            c[i].sample(tmp);
+            col += csamples;
+        }
+    }
+
+    template<typename RES>
+    void sample_pos(RES& res) const {
+        unsigned col = 0;
+        for (unsigned i = 0; i < c.size(); ++i) {
+            unsigned csamples = c[i].w * res.cols();
+            auto tmp = res.template block(0, col, 2, csamples);
+            c[i].sample_pos(tmp);
             col += csamples;
         }
     }

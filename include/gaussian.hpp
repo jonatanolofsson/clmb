@@ -94,6 +94,11 @@ struct alignas(16) Gaussian_ {
         nrand(res, x, P);
     }
 
+    template<typename RES>
+    void sample_pos(RES& res) const {
+        nrand(res, pos(), poscov());
+    }
+
     void sampled_pos_pdf(const Eigen::Array<double, 2, Eigen::Dynamic>& points,
                          Eigen::Array<double, 1, Eigen::Dynamic>& res,
                          const double scale = 1) const {

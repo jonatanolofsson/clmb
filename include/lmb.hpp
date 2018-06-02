@@ -207,31 +207,34 @@ class SILMB {
         return res;
     }
 
-    Eigen::Array<double, 1, Eigen::Dynamic> pos_phd(const Eigen::Array<double, 2, Eigen::Dynamic>& points, const Eigen::Vector2d& gridsize) {
-        Eigen::Array<double, 2, Eigen::Dynamic> nepoints(2, points.cols());
-        Eigen::Array<double, 1, Eigen::Dynamic> res(1, points.cols());
+    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> pos_phd(const AABBox fov, const Eigen::Array2i size) {
+        cf::LL origin; origin << (fov.min[0] + fov.max[0]) / 2, (fov.min[1] + fov.max[1]) / 2;
+        AABBox neaabbox = fov.neaabbox(origin);
+        Eigen::Array2d gridsize; gridsize <<
+            (neaabbox.max[0] - neaabbox.min[0]) / size.x(),
+            (neaabbox.max[1] - neaabbox.min[1]) / size.y();
+        Eigen::Array2d corner; corner << neaabbox.min[0], neaabbox.min[1];
+        Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> res(size.x(), size.y());
         res.setZero();
-        if (points.cols() == 0) { return res; }
+        static const int nof_samples = 1000;
 
-        AABBox neaabbox(0.0, 0.0, gridsize.x(), gridsize.y());
-        for (unsigned p = 0; p != points.cols(); ++p) {
-            auto point2 = cf::ne2ll(gridsize, points.col(p));
-            AABBox llaabbox(points(0, p), points(1, p), point2(0), point2(1));
-            //std::cout << "phd aabbbox: " << points.col(p).transpose() << " -> " << point2.transpose() << " :: " << aabbox << std::endl;
-            Targets targets = targettree.query(llaabbox);
-            if (targets.size() == 0) { continue; }
-            PARFOR
-            for (std::size_t t = 0; t < targets.size(); ++t) { targets[t]->transform_to_local(points.col(p)); }
-            double phdval = 0;
-            OMP(parallel for reduction(+:phdval))
-            for (std::size_t t = 0; t < targets.size(); ++t) {
-                phdval += targets[t]->r * targets[t]->pdf.overlap(neaabbox);
+        CRITICAL(ttree)
+        {
+            auto targets = targettree.query(fov);
+            Eigen::Array<double, 2, Eigen::Dynamic> samples(2, nof_samples);
+            for (auto t : targets) {
+                t->transform_to_local(origin);
+                t->pdf.sample_pos(samples);
+                t->transform_to_global();
+                for (auto s = 0; s < nof_samples; ++s) {
+                    Eigen::Vector2i p = ((samples.col(s).array() - corner) / gridsize).floor().cast<int>();
+                    if (p.x() < size.x() && p.y() < size.y() && p.x() >=0 && p.y() >= 0) {
+                        res(p.x(), p.y()) += t->r;
+                    }
+                }
             }
-            res[p] = phdval;
-            PARFOR
-            for (std::size_t t = 0; t < targets.size(); ++t) { targets[t]->transform_to_global(); }
+            res /= nof_samples;
         }
-
         return res;
     }
 

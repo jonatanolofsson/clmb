@@ -45,4 +45,5 @@ ifdef USE_GCC
     COMPILER = g++
 endif
 
+!python = |> python3 -B %f |>
 .gitignore

@@ -39,7 +39,7 @@ struct TargetTree_ {
 
     void remove(Target* const t) {
         auto llaabbox = t->llaabbox();
-        tree.Remove(llaabbox.min, llaabbox.max, t);
+        tree.Remove(llaabbox.min.data(), llaabbox.max.data(), t);
     }
 
     void remove_all() {
@@ -54,7 +54,7 @@ struct TargetTree_ {
 
     void replace(Target* const t) {
         auto llaabbox = t->llaabbox();
-        tree.Insert(llaabbox.min, llaabbox.max, t);
+        tree.Insert(llaabbox.min.data(), llaabbox.max.data(), t);
     }
 
     Target* new_target(double r, PDF&& p, const double t0 = 0) {
@@ -65,14 +65,14 @@ struct TargetTree_ {
 #ifdef DEBUG_OUTPUT
         std::cout << "New target: " << *t << ": " << llaabbox << std::endl;
 #endif
-        tree.Insert(llaabbox.min, llaabbox.max, t);
+        tree.Insert(llaabbox.min.data(), llaabbox.max.data(), t);
         return t;
     }
 
     Targets query(const AABBox& llaabbox) const {
         Targets result;
-        tree.Search(llaabbox.min,
-                    llaabbox.max,
+        tree.Search(llaabbox.min.data(),
+                    llaabbox.max.data(),
                     rtree_callback<Target, Targets>,
                     reinterpret_cast<void*>(&result));
 
