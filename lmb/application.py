@@ -69,7 +69,7 @@ class Application:
         """Override."""
         raise NotImplementedError("Override the method plx. Kthxbye")
 
-    def sample_phd(self):
+    async def sample_phd(self):
         """Sample phd."""
         phd = np.copy(self.tracker.pos_phd(self.region, self.phdsize))
         if np.isnan(phd).any():

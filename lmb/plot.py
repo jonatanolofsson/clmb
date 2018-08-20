@@ -21,7 +21,7 @@ from matplotlib.patches import Ellipse, Polygon
 from . import cf
 
 
-CMAP = matplotlib.colors.ListedColormap(RandomState(0).rand(256*256, 3))
+CMAP = matplotlib.colors.ListedColormap(RandomState(76).rand(256*256, 3))
 
 
 def eigsorted(cov):

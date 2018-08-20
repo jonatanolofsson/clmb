@@ -107,7 +107,7 @@ PYBIND11_MODULE(lmb, m) {
     py::class_<Tracker::Gaussian>(m, "Gaussian")
         .def(py::init<Tracker::Gaussian::State,
                       Tracker::Gaussian::Covariance,
-                      double>())
+                      double>(), "state"_a, "cov"_a, "w"_a=1.0)
         .def_readwrite("w", &Tracker::Gaussian::w)
         .def_readwrite("m", &Tracker::Gaussian::x)
         .def_readwrite("P", &Tracker::Gaussian::P)
