@@ -209,7 +209,7 @@ struct GM {
         unsigned col = 0;
         for (unsigned i = 0; i < c.size(); ++i) {
             unsigned csamples = c[i].w * res.cols();
-            auto tmp = res.template block(0, col, 2, csamples);
+            auto tmp = res.block(0, col, 2, csamples);
             c[i].sample(tmp);
             col += csamples;
         }
@@ -220,7 +220,7 @@ struct GM {
         unsigned col = 0;
         for (unsigned i = 0; i < c.size(); ++i) {
             unsigned csamples = c[i].w * res.cols();
-            auto tmp = res.template block(0, col, 2, csamples);
+            auto tmp = res.block(0, col, 2, csamples);
             c[i].sample_pos(tmp);
             col += csamples;
         }

@@ -201,10 +201,11 @@ struct BBox {
         if (denom < 1e-9) {
             return false;
         }
-        auto centerpoint = Eigen::Vector2d(
+        auto centerpoint = Eigen::Vector2d();
+        centerpoint <<
             (x1 * y2 - y1 * x2) * (x3 - x4) - (x1 - x2) * (x3 * y4 - y3 * x4),
-            (x1 * y2 - y1 * x2) * (y3 - y4) - (y1 - y2) * (x3 * y4 - y3 * x4))
-            / denom;
+            (x1 * y2 - y1 * x2) * (y3 - y4) - (y1 - y2) * (x3 * y4 - y3 * x4);
+        centerpoint /= denom;
         return within(centerpoint);
     }
 

@@ -33,10 +33,6 @@ struct Cluster_ {
       params(params_)
     {}
 
-    //explicit Cluster_(const Targets& targets_, const Params* params_)
-    //: targets(targets_),
-      //params(params_) {}
-
     template<typename TargetTree, typename Sensor>
     void correct(TargetTree& targettree, const Sensor& sensor, const double time) {
         unsigned M = targets.size();
