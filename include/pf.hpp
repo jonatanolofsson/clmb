@@ -219,7 +219,9 @@ struct PF {
         // See https://en.wikipedia.org/wiki/Weighted_arithmetic_mean#Weighted_sample_covariance
         auto d = (x.colwise() - m.array());
         return (d.rowwise() * w).matrix() * d.matrix().transpose()
-            / (1 - (w * w).sum());
+            // Unbiased:
+            // (1 - (w * w).sum())
+        ;
     }
 
     Covariance cov() const {
