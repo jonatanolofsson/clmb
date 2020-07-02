@@ -7,6 +7,3 @@
 [submodule "libs/swss"]
 	path = libs/swss
 	url = git@github.com:eidheim/Simple-WebSocket-Server.git
-[submodule "libs/pybind11"]
-	path = libs/pybind11
-	url = git@github.com:pybind/pybind11.git

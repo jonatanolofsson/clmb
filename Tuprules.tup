@@ -7,7 +7,7 @@ CFLAGS += -Wno-unknown-pragmas
 CFLAGS += -Wfatal-errors
 CFLAGS += -pedantic-errors
 CFLAGS += -Wextra
-CFLAGS += -Wcast-align
+#CFLAGS += -Wcast-align
 CFLAGS += -g
 CFLAGS += -O3
 CFLAGS += -I$(TOP)/include
@@ -17,7 +17,7 @@ CFLAGS += -fPIC
 #CFLAGS += -DNOPAR
 
 APP_CFLAGS += -I$(TOP)/libs/swss
-PY_CFLAGS = -shared -I$(TOP)/libs/pybind11/include -I/usr/include/python3.7m -I/usr/include/python3.7m -Wno-nested-anon-types  -Wno-unused-result -Wsign-compare -march=x86-64 -mtune=generic -O2 -pipe -fstack-protector-strong -fno-plt -DNDEBUG -g -fwrapv -O3 -Wall -Wstrict-prototypes
+PY_CFLAGS = -shared -Wno-nested-anon-types  -Wno-unused-result -Wsign-compare -march=x86-64 -mtune=generic -O2 -pipe -fstack-protector-strong -fno-plt -DNDEBUG -g -fwrapv -O3 -Wall -Wstrict-prototypes
 TEST_CFLAGS  = -I$(TOP)/src
 
 APP_LDFLAGS  = -lboost_system
@@ -26,8 +26,7 @@ APP_LDFLAGS += -lboost_coroutine
 APP_LDFLAGS += -lboost_context
 APP_LDFLAGS += -lssl
 APP_LDFLAGS += -lcrypto
-PY_LDFLAGS = -L/usr/lib -lpython3.7m -lpthread -ldl  -lutil -lm  -Xlinker -export-dynamic
-PY_EXT = cpython-37m-x86_64-linux-gnu.so
+PY_LDFLAGS = -L/usr/lib -lpthread -ldl  -lutil -lm  -Xlinker -export-dynamic
 
 
 TEST_LDFLAGS  = -lgtest_main -lgtest
@@ -46,5 +45,7 @@ ifdef USE_GCC
     COMPILER = g++
 endif
 
-!python = |> condarun aniceday python3 -B %f |>
+PYTHON = condarun aniceday python3 -B
+
+!python = |> $(PYTHON) %f |>
 .gitignore
