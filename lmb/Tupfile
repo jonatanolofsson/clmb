@@ -1,4 +1,2 @@
 include_rules
-!pycc = |> $(COMPILER) $(CFLAGS) $(APP_CFLAGS) $(PY_CFLAGS) %f -o %o $(LDFLAGS) $(APP_LDFLAGS) $(PY_LDFLAGS) |>
-
-:foreach *.cpp | ../<pre> |> !pycc |> %B.$(PY_EXT) $(TOP)/<libs>
+run $(TOP)/lmb/pymod.sh

@@ -81,14 +81,14 @@ ECEF lla2ecef(const LLA& lla) {
 }
 
 template<typename LL>
-ECEF ll2ecef(const LL& lla) {
+ECEF ll2ecef(const LL& ll) {
     static const double a = 6378137.0;               // WGS-84 semi-major axis
     static const double e2 = 6.6943799901377997e-3;  // WGS-84 first eccentricity squared        // NOLINT
 
     Eigen::Vector3d ecef;
     double lat, lon, n, slat, slat2, slon, clon, clat;
-    lat = lla(0);
-    lon = lla(1);
+    lat = ll(0);
+    lon = ll(1);
 
     slat = sind(lat);
     slon = sind(lon);
@@ -127,8 +127,7 @@ NED lla2ned(const LLA& lla, const LLA_ORIGIN& origin) {
 template<typename LL, typename LL_ORIGIN>
 NE ll2ne(const LL& ll, const LL_ORIGIN& origin) {
     auto ecef = ll2ecef(ll);
-    LLA lla_origin; lla_origin << origin, 0;
-    return ecef2ne(ecef, lla_origin);
+    return ecef2ne(ecef, origin);
 }
 
 template<typename ECEF>

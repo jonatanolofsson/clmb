@@ -75,9 +75,9 @@ void allbut(const Eigen::Matrix<double, 1, Eigen::Dynamic>& from, Eigen::Matrix<
 
 
 struct MurtyState {
-    using Slacklist = std::vector<std::tuple<double, unsigned, unsigned>>;
+    using Duallist = std::vector<std::tuple<double, unsigned, unsigned>>;
     Eigen::MatrixXd C;
-    Slack u, v;
+    Dual u, v;
     double cost;
     double boundcost;
     bool solved;
@@ -115,7 +115,7 @@ struct MurtyState {
         allbut(C, s->C, i, j);
         allbut(u, s->u, i);
         allbut(v, s->v, j);
-        //std::cout << "            Binding (" << rmap[i] << "," << cmap[j] << ") (" << C(i, j) << ") [" << s->C.rows() << "x" << s->C.cols() << "]" << std::endl;
+        std::cout << "            Binding (" << i << "," << j << ") (" << C(i, j) << ") [" << s->C.rows() << "x" << s->C.cols() << "]" << std::endl;
         s->rmap.erase(s->rmap.begin() + i);
         s->cmap.erase(s->cmap.begin() + j);
         s->boundcost += C(i, j);
@@ -123,67 +123,89 @@ struct MurtyState {
         return s;
     }
 
-    auto partition_without(const unsigned i, const unsigned j, const double slack) {
+    auto partition_without(const unsigned i, const unsigned j, const double dual) {
         auto s = std::make_shared<MurtyState>(this);
         s->C = C;
         s->u = u;
         s->v = v;
-        s->remove(i, j, slack);
+        s->remove(i, j, dual);
 
         return s;
     }
 
-    void remove(const unsigned i, const unsigned j, const double slack) {
-        //std::cout << "            Removing (" << rmap[i] << "," << cmap[j] << ") (" << C(i, j) << ") [" << C.rows() << "x" << C.cols() << "] raising cost " << cost << " -> ";
+    void remove(const unsigned i, const unsigned j, const double dual) {
+        //std::cout << " ::::::::::  Remove ::::::::::" << std::endl;
+        //std::cout << "Dual u: " << std::endl << u.replicate(1, C.cols()) << std::endl;
+        //std::cout << "Dual v: " << std::endl << v.replicate(1, C.rows()).transpose() << std::endl;
+        //std::cout << "Old C: " << std::endl << C << std::endl;
+        //std::cout << "Dual: " << std::endl << u.replicate(1, C.cols()) + v.replicate(1, C.rows()).transpose() << std::endl;
+        //std::cout << "Reduced C: " << std::endl << C - u.replicate(1, C.cols()) - v.replicate(1, C.rows()).transpose() << std::endl;
+        //std::cout << "            Removing (" << i << "," << j << ") (" << C(i, j) << ") [" << C.rows() << "x" << C.cols() << "] raising cost " << cost << " + " << dual << " = ";
         C(i, j) = lap::inf;
         solved = false;
-        cost += slack;
+        cost += dual;
         //std::cout << cost << std::endl;
         //std::cout << "New C: " << std::endl << C << std::endl;
     }
 
     bool solve() {
-        //std::cout << "Solving (" << cost << "): " << std::endl << C << std::endl;
+        std::cout << "Solving (" << cost << "): " << std::endl << C << std::endl;
         res.resize(C.rows());
         lap::lap(C, res, u, v);
-        //std::cout << "rmap: ";
-        //for (auto& r : rmap) {
-            //std::cout << r << ", ";
-        //}
-        //std::cout << std::endl;
-        //std::cout << "cmap: ";
-        //for (auto& c : cmap) {
-            //std::cout << c << ", ";
-        //}
-        //std::cout << std::endl;
+        //std::cout << "Dual: " << u.transpose() << ", " << v.transpose() << std::endl;
+        //std::cout << "u.rep: " << std::endl << u.replicate(1, C.cols()) << std::endl;
+        //std::cout << "v.rep: " << std::endl << v.replicate(1, C.cols()).transpose() << std::endl;
+        //std::cout << "Dual: " << std::endl << u.replicate(1, C.cols()) + v.replicate(1, C.rows()).transpose() << std::endl;
+        std::cout << "Reduced C: " << std::endl << C - u.replicate(1, C.cols()) - v.replicate(1, C.rows()).transpose() << std::endl;
+        std::cout << " >>>  Prior cost: " << cost << " / " << boundcost;
         cost = boundcost;
         for (unsigned i = 0; i < res.rows(); ++i) {
             solution[rmap[i]] = cmap[res[i]];
             cost += C(i, res[i]);
+            //std::cout << "Dualed: " << i << ":" << res[i] << ": " << C(i, res[i]) - u[i] - v[res[i]] << std::endl;
         }
-        //std::cout << "Solution: [" << res.transpose() << "] " << cost << std::endl;
+        std::cout << " >>>  Posterior cost: " << cost << std::endl;
+        std::cout << "Solution: [" << res.transpose() << "] " << cost << std::endl;
+        auto r = (C - u.replicate(1, C.cols()) - v.replicate(1, C.rows()).transpose()).array();
+        if ((r < 0).any()) {
+            std::cout << "Reduced cost < 0" << std::endl;
+            //std::exit(1);
+        }
         solved = true;
         return (cost < lap::inf);
     }
 
-    MurtyState::Slacklist minslack() const {
-        std::vector<std::tuple<double, unsigned, unsigned>> mslack(C.rows());
+    MurtyState::Duallist sort_by_dual() const {
+        std::cout << " ::::::::::  sort_by_dual ::::::::::" << std::endl;
+        std::cout << "C: " << std::endl << C << std::endl;
+        std::cout << "Reduced C: " << std::endl << C - u.replicate(1, C.cols()) - v.replicate(1, C.rows()).transpose() << std::endl;
+        std::cout << "res: " << res.transpose() << std::endl;
+        std::cout << "Cost: " << cost << std::endl;
+        MurtyState::Duallist mdual(C.rows());
         double h;
         for (unsigned i = 0; i < C.rows(); ++i) {
-            mslack[i] = {C(i, 0) - u[i] - v[0], i, res[i]};
-            for (unsigned j = 1; j < C.cols(); ++j) {
+            mdual[i] = {lap::inf, i, res[i]};
+            for (unsigned j = 0; j < C.cols(); ++j) {
                 if (static_cast<int>(j) == res[i]) {
+                    continue;
+                }
+                if (C(i, j) >= lap::inf) {
                     continue;
                 }
 
                 h = C(i, j) - u[i] - v[j];
-                if (h < std::get<0>(mslack[i])) {
-                    mslack[i] = {h, i, res[i]};
+                if (h < std::get<0>(mdual[i])) {
+                    std::cout << "Found better dual: " << i << "," << j << ": " << C(i, j) << " - " << u[i] << " - " << v[j] << " = " << h << std::endl;
+                    std::get<0>(mdual[i]) = h;
                 }
             }
         }
-        std::sort(mslack.rbegin(), mslack.rend());
-        return mslack;
+        std::sort(mdual.rbegin(), mdual.rend());
+        std::cout << "Dual: " << std::endl;
+        for (unsigned i = 0; i < C.rows(); ++i) {
+            std::cout << "    (" << std::get<0>(mdual[i]) << ", " << std::get<1>(mdual[i]) << ", " << std::get<2>(mdual[i])  << ")" << std::endl;
+        }
+        return mdual;
     }
 };
 
@@ -215,7 +237,7 @@ class Murty {
         queue.emplace(std::make_shared<MurtyState>(C));
     }
 
-    void get_partition_index(const MurtyState::Slacklist& partition_order, MurtyState::Slacklist::iterator p, unsigned& i, unsigned& j) {
+    void get_partition_index(const MurtyState::Duallist& partition_order, MurtyState::Duallist::iterator p, unsigned& i, unsigned& j) {
         i = std::get<1>(*p);
         j = std::get<2>(*p);
         for (auto pp = partition_order.begin(); pp != p; ++pp) {
@@ -257,9 +279,9 @@ class Murty {
         if (cost > lap::inf) {
             return false;
         }
-        //std::cout << "Solution: " << sol.transpose() << std::endl;
-        //std::cout << "Cost: " << cost << std::endl;
-        //std::cout << "res: " << s->res.transpose() << std::endl;
+        std::cout << "Solution: " << sol.transpose() << std::endl;
+        std::cout << "Cost: " << cost << std::endl;
+        std::cout << "res: " << s->res.transpose() << std::endl;
         //std::cout << "rmap: ";
         //for (auto& r : s->rmap) {
             //std::cout << r << ", ";
@@ -271,14 +293,18 @@ class Murty {
         //}
         //std::cout << std::endl;
         //std::cout << s->C << std::endl;
+        std::cout << "Size: " << s->C.rows() << std::endl;
 
-        auto partition_order = s->minslack();
+        auto partition_order = s->sort_by_dual();
         auto p = partition_order.begin();
         auto node = s;
 
-        for (; p != partition_order.end(); ++p) {
+        for (; p != partition_order.end() - 1; ++p) {
             get_partition_index(partition_order, p, i, j);
-            queue.push(node->partition_without(i, j, std::get<0>(*p)));
+            auto dual = std::get<0>(*p);
+            if (dual < lap::inf) {
+                queue.push(node->partition_without(i, j, dual));
+            }
             node = node->partition_with(i, j);
         }
         return true;
