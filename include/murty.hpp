@@ -10,10 +10,13 @@
 #include <set>
 #include <tuple>
 #include <vector>
-#include "lap.hpp"
+#include <limits>
+#include "rlapjv.h"
 
 namespace lap {
-using CostMatrix = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>;
+//using Assignment = Eigen::Matrix<int, Eigen::Dynamic, 1>;
+//using Dual = Eigen::Matrix<double, Eigen::Dynamic, 1>;
+//static const double inf = std::numeric_limits<double>::infinity();
 
 class EmptyQueue: public std::exception {
  public:
@@ -22,7 +25,7 @@ class EmptyQueue: public std::exception {
     }
 };
 
-void allbut(const Eigen::MatrixXd& from, Eigen::MatrixXd& to, const unsigned row, const unsigned col) {
+void allbut(const CostMatrix& from, CostMatrix& to, const unsigned row, const unsigned col) {
     unsigned rows = from.rows();
     unsigned cols = from.cols();
 
@@ -76,7 +79,7 @@ void allbut(const Eigen::Matrix<double, 1, Eigen::Dynamic>& from, Eigen::Matrix<
 
 struct MurtyState {
     using Duallist = std::vector<std::tuple<double, unsigned, unsigned>>;
-    Eigen::MatrixXd C;
+    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> C;
     Dual u, v;
     double cost;
     double boundcost;
@@ -94,7 +97,7 @@ struct MurtyState {
       rmap(s->rmap),
       cmap(s->cmap) {}
 
-    explicit MurtyState(const Eigen::MatrixXd& C_)
+    explicit MurtyState(const CostMatrix& C_)
     : C(C_),
       u(C_.rows()),
       v(C_.cols()),
@@ -115,7 +118,7 @@ struct MurtyState {
         allbut(C, s->C, i, j);
         allbut(u, s->u, i);
         allbut(v, s->v, j);
-        std::cout << "            Binding (" << i << "," << j << ") (" << C(i, j) << ") [" << s->C.rows() << "x" << s->C.cols() << "]" << std::endl;
+        //std::cout << "            Binding (" << i << "," << j << ") (" << C(i, j) << ") [" << s->C.rows() << "x" << s->C.cols() << "]" << std::endl;
         s->rmap.erase(s->rmap.begin() + i);
         s->cmap.erase(s->cmap.begin() + j);
         s->boundcost += C(i, j);
@@ -129,6 +132,7 @@ struct MurtyState {
         s->u = u;
         s->v = v;
         s->remove(i, j, dual);
+        //std::cout << "            Removing (" << i << "," << j << ") (" << C(i, j) << ") [" << s->C.rows() << "x" << s->C.cols() << "]" << std::endl;
 
         return s;
     }
@@ -149,38 +153,48 @@ struct MurtyState {
     }
 
     bool solve() {
-        std::cout << "Solving (" << cost << "): " << std::endl << C << std::endl;
+        //std::cout << "Solving (" << cost << "): " << std::endl << C << std::endl;
         res.resize(C.rows());
-        lap::lap(C, res, u, v);
+        auto lapped = lap(C, res, u, v);
+        solved = true;
         //std::cout << "Dual: " << u.transpose() << ", " << v.transpose() << std::endl;
+        //std::cout << "u: " << u.transpose() << std::endl;
+        //std::cout << "v: " << v.transpose() << std::endl;
         //std::cout << "u.rep: " << std::endl << u.replicate(1, C.cols()) << std::endl;
         //std::cout << "v.rep: " << std::endl << v.replicate(1, C.cols()).transpose() << std::endl;
         //std::cout << "Dual: " << std::endl << u.replicate(1, C.cols()) + v.replicate(1, C.rows()).transpose() << std::endl;
-        std::cout << "Reduced C: " << std::endl << C - u.replicate(1, C.cols()) - v.replicate(1, C.rows()).transpose() << std::endl;
-        std::cout << " >>>  Prior cost: " << cost << " / " << boundcost;
+        //std::cout << "Reduced C: " << std::endl << C - u.replicate(1, C.cols()) - v.replicate(1, C.rows()).transpose() << std::endl;
+        //std::cout << " >>>  Prior cost: " << cost << " / " << boundcost;
+        if (!lapped) {
+            //std::cout << " ISINF!!!!!!!!!!!" << std::endl;
+            return false;
+            //std::exit(1);
+        }
+        //std::cout << " NOINF!!!!!!!!!!!" << std::endl;
         cost = boundcost;
         for (unsigned i = 0; i < res.rows(); ++i) {
             solution[rmap[i]] = cmap[res[i]];
             cost += C(i, res[i]);
             //std::cout << "Dualed: " << i << ":" << res[i] << ": " << C(i, res[i]) - u[i] - v[res[i]] << std::endl;
         }
-        std::cout << " >>>  Posterior cost: " << cost << std::endl;
-        std::cout << "Solution: [" << res.transpose() << "] " << cost << std::endl;
-        auto r = (C - u.replicate(1, C.cols()) - v.replicate(1, C.rows()).transpose()).array();
-        if ((r < 0).any()) {
-            std::cout << "Reduced cost < 0" << std::endl;
-            //std::exit(1);
-        }
-        solved = true;
+        //std::cout << " >>>  Posterior cost: " << cost << std::endl;
+        //std::cout << "Solution: [" << res.transpose() << "] " << cost << std::endl;
+        //auto r = (C - u.replicate(1, C.cols()) - v.replicate(1, C.rows()).transpose()).array();
+        //if ((r < 0).any()) {
+            //std::cout << "Reduced cost < 0" << std::endl;
+            ////std::exit(1);
+        //}
         return (cost < lap::inf);
     }
 
     MurtyState::Duallist sort_by_dual() const {
-        std::cout << " ::::::::::  sort_by_dual ::::::::::" << std::endl;
-        std::cout << "C: " << std::endl << C << std::endl;
-        std::cout << "Reduced C: " << std::endl << C - u.replicate(1, C.cols()) - v.replicate(1, C.rows()).transpose() << std::endl;
-        std::cout << "res: " << res.transpose() << std::endl;
-        std::cout << "Cost: " << cost << std::endl;
+        //std::cout << " ::::::::::  sort_by_dual ::::::::::" << std::endl;
+        //std::cout << "C: " << std::endl << C << std::endl;
+        //std::cout << "u: " << std::endl << u.transpose() << std::endl;
+        //std::cout << "v: " << std::endl << v.transpose() << std::endl;
+        //std::cout << "Reduced C: " << std::endl << C - u.replicate(1, C.cols()) - v.replicate(1, C.rows()).transpose() << std::endl;
+        //std::cout << "res: " << res.transpose() << std::endl;
+        //std::cout << "Cost: " << cost << std::endl;
         MurtyState::Duallist mdual(C.rows());
         double h;
         for (unsigned i = 0; i < C.rows(); ++i) {
@@ -195,16 +209,16 @@ struct MurtyState {
 
                 h = C(i, j) - u[i] - v[j];
                 if (h < std::get<0>(mdual[i])) {
-                    std::cout << "Found better dual: " << i << "," << j << ": " << C(i, j) << " - " << u[i] << " - " << v[j] << " = " << h << std::endl;
+                    //std::cout << "Found better dual: " << i << "," << j << ": " << C(i, j) << " - " << u[i] << " - " << v[j] << " = " << h << std::endl;
                     std::get<0>(mdual[i]) = h;
                 }
             }
         }
         std::sort(mdual.rbegin(), mdual.rend());
-        std::cout << "Dual: " << std::endl;
-        for (unsigned i = 0; i < C.rows(); ++i) {
-            std::cout << "    (" << std::get<0>(mdual[i]) << ", " << std::get<1>(mdual[i]) << ", " << std::get<2>(mdual[i])  << ")" << std::endl;
-        }
+        //std::cout << "Dual: " << std::endl;
+        //for (unsigned i = 0; i < C.rows(); ++i) {
+            //std::cout << "    (" << std::get<0>(mdual[i]) << ", " << std::get<1>(mdual[i]) << ", " << std::get<2>(mdual[i])  << ")" << std::endl;
+        //}
         return mdual;
     }
 };
@@ -260,6 +274,7 @@ class Murty {
         //std::cout << "Draw! Queue size: " << queue.size() << std::endl;
 
         if (queue.empty()) {
+            //std::cout << "Draw! Queue empty!: " << queue.size() << std::endl;
             return false;
         }
 
@@ -268,6 +283,7 @@ class Murty {
             if (s->solve()) {
                 queue.push(s);
             }
+            //else std::cout << "Solve failed" << std::endl;
             if (queue.empty()) {
                 //std::cout << "Queue empty 1!" << std::endl;
                 return false;
@@ -276,12 +292,10 @@ class Murty {
         queue.pop();
         sol = s->solution;
         cost = s->cost + offset;
-        if (cost > lap::inf) {
-            return false;
-        }
-        std::cout << "Solution: " << sol.transpose() << std::endl;
-        std::cout << "Cost: " << cost << std::endl;
-        std::cout << "res: " << s->res.transpose() << std::endl;
+        //std::cout << "Solution: [" << sol.transpose() << "] " << cost << std::endl;
+        //std::cout << "Solution: " << sol.transpose() << std::endl;
+        //std::cout << "Cost: " << cost << std::endl;
+        //std::cout << "res: " << s->res.transpose() << std::endl;
         //std::cout << "rmap: ";
         //for (auto& r : s->rmap) {
             //std::cout << r << ", ";
@@ -293,15 +307,16 @@ class Murty {
         //}
         //std::cout << std::endl;
         //std::cout << s->C << std::endl;
-        std::cout << "Size: " << s->C.rows() << std::endl;
+        //std::cout << "Size: " << s->C.rows() << std::endl;
 
         auto partition_order = s->sort_by_dual();
         auto p = partition_order.begin();
         auto node = s;
 
-        for (; p != partition_order.end() - 1; ++p) {
+        for (; p != partition_order.end(); ++p) {
             get_partition_index(partition_order, p, i, j);
             auto dual = std::get<0>(*p);
+            //std::cout << "dual: " << dual << " i: " << i << " j: " << j << std::endl;
             if (dual < lap::inf) {
                 queue.push(node->partition_without(i, j, dual));
             }

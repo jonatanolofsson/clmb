@@ -13,7 +13,7 @@
 #include "cf.hpp"
 #include "cluster.hpp"
 #include "connectedcomponents.hpp"
-#include "lap.hpp"
+#include "rlapjv.h"
 #include "omp.hpp"
 #include "params.hpp"
 #include "sensors.hpp"

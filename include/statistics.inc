@@ -1,6 +1,4 @@
 #pragma once
-#ifndef STATISTICS_INC
-#define STATISTICS_INC
 
 #include <random>
 #include <Eigen/Eigenvalues>
@@ -20,5 +18,3 @@ namespace lmb {
         return ndist(gen);
     }
 }
-
-#endif // STATISTICS_INC
