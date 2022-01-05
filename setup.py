@@ -10,6 +10,8 @@ from setuptools import setup, find_packages
 # To use a consistent encoding
 from codecs import open
 from os import path
+from glob import glob
+from pybind11.setup_helpers import Pybind11Extension
 
 here = path.abspath(path.dirname(__file__))
 
@@ -44,7 +46,7 @@ setup(
 
         # Specify the Python versions you support here. In particular, ensure
         # that you indicate whether you support Python 2, Python 3 or both.
-        'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.10',
     ],
 
     # What does your project relate to?
@@ -53,4 +55,6 @@ setup(
     # You can just specify the packages manually here if your project is
     # simple. Or you can use find_packages().
     packages=find_packages(exclude=['contrib', 'docs', 'tests*']),
+    package_data={'': ['*.so']},
+    zip_safe=False
 )

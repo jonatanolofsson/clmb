@@ -10,7 +10,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import lmb
 from lmb import cf
-import phdplanner as ppl
 LOGGER = logging.getLogger(__name__)
 
 
